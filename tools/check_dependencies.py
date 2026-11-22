@@ -501,8 +501,11 @@ def naming_violations(info):
         """パスの末尾（ファイル名の直前）が dirs と一致するか。例: tail("domain", "use_cases")"""
         return len(parts) > len(dirs) and tuple(parts[-1 - len(dirs):-1]) == dirs
 
-    if name.endswith("_use_case.gd") and not tail("domain", "use_cases"):
-        out.append((1, "*_use_case.gd は domain/use_cases/ にだけ置ける"))
+    # 例外: 複数コンテキストが共有する表示専用の UseCase は core/domain/moon/ に置く
+    # （背景の月。architecture.md の core/domain の記述。client_design A-1）
+    shared_use_case = parts[0] == "core" and tail("domain", "moon")
+    if name.endswith("_use_case.gd") and not tail("domain", "use_cases") and not shared_use_case:
+        out.append((1, "*_use_case.gd は domain/use_cases/ にだけ置ける（共有の表示専用は core/domain/moon/ も可）"))
     if name.endswith("_presenter.gd") and "presentation" not in parts[:-1]:
         out.append((1, "*_presenter.gd は presentation/ にだけ置ける"))
     if (name.endswith("_api_repository.gd") or (name.startswith("local_") and name.endswith("_repository.gd"))) \
