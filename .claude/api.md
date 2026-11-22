@@ -14,7 +14,7 @@
 | ヘッダー | 向き | 内容 |
 |---------|------|------|
 | `Authorization: Bearer {access_token}` | 送信 | 認証付き API。`ApiClient` が付ける（sign_up / sign_in / version / refresh には付けない） |
-| `X-Unique-Request-Identifier` | 送信 | 冪等キー（UUID v4）。**login と consent に付ける**。寿命は「ひとつの操作」で、presenter が持つ。通信断・409・503 の再送では同じキー、業務エラー（299）の後は作り直す（client_design.md 3-4） |
+| `X-Unique-Request-Identifier` | 送信 | 冪等キー（UUID v4）。**login・consent・`POST /login_bonus/receive` に付ける**（`POST /login_bonus/list` は付けない）。寿命は「ひとつの操作」で、presenter が持つ。通信断・409・503 の再送では同じキー、業務エラー（299）の後は作り直す（client_design.md 3-4） |
 | `X-Master-Hash` | 送信 | 端末が持つマスターのハッシュ。空でなければ全リクエストに付ける |
 | `X-Platform: Apple` / `Google` | 送信 | 端末の platform。**`ApiClient.request()` を通る全リクエストに `_build_headers()` の 1 か所で付ける**（refresh・`GET /auth/version` を含む）。`download()`（配信ホスト・規約本文）と Toast の `/broadcasting/auth` には付けない。署名には含めない。値は `ApiConfig.platform()`: 環境変数 `NEXUS_PLATFORM` → `[nexus]` の `platform` → OS の既定（iOS → Apple、Android → Google、それ以外 → Apple）。許可値は `Apple` / `Google`（大文字小文字は区別せず正規形に直す）で、不正値は警告して OS の既定に戻す。欠落・不正はサーバーが HTTP 299 / `error_code` 99003 で拒否する（画面は汎用の BUSINESS 表示のまま、`push_error` を 1 回出す）。`set_platform("")` で付けない状態を作れる（e2e 専用） |
 | `Accept-Language: ja` | 送信 | 言語。**`request()` を通る全リクエストに `_build_headers()` の 1 か所で付ける**（`X-Platform` と同じ位置。refresh・version を含む）。`download()` と Toast の `/broadcasting/auth` には付けない。署名には含めない。値は `ApiConfig.language()` の固定 `ja`（環境変数・`[nexus]` で上書きしない）。サーバーの `ResolveLanguage` が解釈する（無い・非対応は `ja`）。今の応答は変わらない（言語を使うのはメール一覧など）。マスターの名前の引き（`mst_item__l10n`）も同じ値 |
@@ -104,8 +104,21 @@ X-Client-Signature: HMAC-SHA256("{timestamp}:{nonce}:{request_body}")
 | `trx_diamond` | `player` の Repository（`PlayerState.trx_diamond`）。**単数のオブジェクト**（`X-Platform` の platform の 1 行。有償は `paid_amount`。`free_amount` は無い。無償は `trx_item_list` の `free_diamond`）。行が無い・null・型違いは空の辞書。旧キー `trx_diamond_list` は読まない |
 | `is_delete`（各行） | 真偽値。移行の間は 0/1 も来うるので `PlayerState.is_row_deleted()` で読む |
 | `login_bonus_list` | `login` の Repository。要素は `unique_id` / `type` / `id` / `amount` / `expire_at`（常に null）/ `metadata`（null 可。`grade` があるときだけグレードを表示する） |
+| `login_bonus_calendar` / `vip_login_bonus_calendar` | `login` の Repository（`LoginBonusCalendars`。通常の段・VIP の段の**進捗**だけ。日ごとの報酬・周期の日数は応答に無く、マスターから引く）。キーの欠落・null は「その段なし」（旧サーバーの応答は両方 null）。`LoginBonusCalendarsResponse` が変換する |
 
 保持はメモリのみ（永続化しない）。
+
+### 3-2. ログインボーナスの状態取得・再受け取り
+
+項目・エラーコードの正はサーバーの `docs/design/login-bonus-calendar/api.md`（複製しない）。クライアントの設計は [client_design.md](../docs/design/login-bonus-calendar/client_design.md)。呼び出しは `login` の `LoginBonusCalendarApiRepository`（契約 `LoginBonusCalendarRepository`）。
+
+| API | 呼び元 | 冪等キー | 応答の扱い |
+|------|------|------|------|
+| `POST /login_bonus/list` | ホームのボタンから開いたログインボーナス画面（開くたびに 1 回）。`FetchLoginBonusCalendarsUseCase` | **付けない**（同じキーの応答が再生され、古い状態が返るのを避ける。本文なし） | 通常・VIP の段の進捗で `login` の Repository を置き換える（login 応答と同じ変換） |
+| `POST /login_bonus/receive` | VIP の再受け取りボタン。`ReceiveVipLoginBonusUseCase` | **付ける**（本文は `mst_vip_login_bonus_id`。キーは presenter が持つ） | `login_bonus_list`（今回の報酬）・`vip_login_bonus_calendar`・`updated_resources` を読む。所持数は `ApplyUpdatedResourcesUseCase` で反映し、VIP の段を置き換える |
+
+- 再送のキー: 通信断・409・503 は同じキー、業務エラー（299。26001〜26003 など）の後・成功の後は新しいキー（`IdempotencyKey.can_reuse`）。26001〜26003 はコードで分岐せず、画面が `list` で状態を取り直す
+- 失敗は `ApiResult.to_app_error()` で `AppError` にする（401 の refresh は `ApiClient`）
 
 ### 4. トークンリフレッシュ
 
