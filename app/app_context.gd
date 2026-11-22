@@ -47,6 +47,8 @@ var _mst_vip_login_bonus_repository: MstVipLoginBonusRepository
 
 # --- core ---
 var _clock: SystemClock
+var _moon_override: MoonOverride
+var _get_background_moon_use_case: GetBackgroundMoonUseCase
 
 # --- auth ---
 var _auth_token_repository: LocalAuthTokenRepository
@@ -197,6 +199,11 @@ func fetch_agreement_document_use_case() -> FetchAgreementDocumentUseCase:
 	return _fetch_agreement_document_use_case
 
 
+## 背景の月の表示値を作る（画面を開くたびに呼ぶ。保存しない）。
+func get_background_moon_use_case() -> GetBackgroundMoonUseCase:
+	return _get_background_moon_use_case
+
+
 # --- デバッグ・e2e 用（製品の画面は使わない。debug/ だけが呼ぶ） ---
 
 
@@ -210,6 +217,12 @@ func debug_auth_token_repository() -> LocalAuthTokenRepository:
 ## 製品の画面は使わない（時刻は UseCase が Clock の契約で受け取る）。
 func debug_clock() -> SystemClock:
 	return _clock
+
+
+## 月の上書き（録画・e2e 用。第 2 段で --e2e-moon-* がここへ設定する）。debug_clock() と同じ形。
+## 製品の画面は使わない（上書きは空のまま）。
+func debug_moon_override() -> MoonOverride:
+	return _moon_override
 
 
 ## 保持中のプレイヤー状態（サーバー時刻のオフセットなどを e2e の出力に出すため。読み取り専用で使う）。
@@ -266,6 +279,11 @@ func _build() -> void:
 		push_warning("マスターデータの DB を開けませんでした")
 
 	_clock = SystemClock.new()
+	# 背景の月（core。特定のコンテキストに属さない）。上書きは e2e だけが設定する
+	_moon_override = MoonOverride.new()
+	_get_background_moon_use_case = GetBackgroundMoonUseCase.new(
+		_clock, SystemTimeZone.new(), _moon_override
+	)
 
 	# --- 2. ApiClient ---
 	_api_client = ApiClient.new()

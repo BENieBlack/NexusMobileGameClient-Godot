@@ -303,6 +303,17 @@ class Rules(Case):
         report = cd.run_check(self.root)
         self.assertEqual(["N1"] * 5, [v.rule for v in report.violations])
 
+    def test_n1_shared_use_case_in_core_moon_ok(self):
+        """前提: *_use_case.gd を core/domain/moon/ に置く（共有の表示専用 UseCase の例外）。
+        期待: 違反なし。"""
+        self.write("core/domain/moon/g_use_case.gd", "class_name GUseCase\nextends RefCounted\n")
+        self.assert_rules([])
+
+    def test_n1_use_case_in_other_core_dir_ng(self):
+        """前提: *_use_case.gd を core/domain/ 直下に置く。 期待: N1（例外は moon/ だけ）。"""
+        self.write("core/domain/g_use_case.gd", "class_name GUseCase\nextends RefCounted\n")
+        self.assert_rules(["N1"])
+
     def test_n1_placement_ok(self):
         """前提: local_*_repository と _response を正しい場所（data/repositories・data/api）に置く。
         期待: 違反なし。"""
