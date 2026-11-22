@@ -361,3 +361,28 @@ func test_cell_rewards_look_up_mst_item_for_item_and_wallet_only() -> void:
 	assert_str(cells[2].icon_mst_item_type).is_empty()
 	assert_bool(_items.asked.has("u1")).is_false()
 	assert_str(cells[3].icon_type).is_equal("mystery")
+
+
+## 前提: FROM_LOGIN（login の行 1 件）に、再受け取りの報酬 2 件を extra_rewards で渡す。
+## 期待: 行は login の 1 件の後ろに 2 件足されて 3 件（受け取った順）。メモリの login_bonus_list は変わらない。
+func test_extra_rewards_are_appended_after_login_rows() -> void:
+	var bonuses: Array[LoginBonus] = [LoginBonus.new("u", "item", "a", 100)]
+	_repository.replace(bonuses)
+	_put_calendars(LoginBonusCalendar.new("lb1", 1, true, true), null)
+	var extra: Array[LoginBonus] = [
+		LoginBonus.new("", "item", "b", 200), LoginBonus.new("", "item", "c", 300)
+	]
+	var screen := _use_case.handle(_masters(), true, true, false, extra)
+	assert_int(screen.rewards.size()).is_equal(3)
+	assert_str(screen.rewards[0].bonus.id).is_equal("a")
+	assert_str(screen.rewards[2].bonus.id).is_equal("c")
+	assert_int(_repository.calendars().normal.last_day).is_equal(1)
+
+
+## 前提: FROM_HOME（include 偽）で extra_rewards を渡す。期待: 行は再受け取りの報酬だけ（Q-3）。
+func test_extra_rewards_alone_when_from_home() -> void:
+	_put_calendars(LoginBonusCalendar.new("lb1", 1, true, false), null)
+	var extra: Array[LoginBonus] = [LoginBonus.new("", "item", "b", 200)]
+	var screen := _use_case.handle(_masters(), false, true, false, extra)
+	assert_int(screen.rewards.size()).is_equal(1)
+	assert_str(screen.rewards[0].bonus.id).is_equal("b")

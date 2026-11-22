@@ -243,6 +243,7 @@ func test_layout_fits_in_viewport() -> void:
 			"Margin/Root/CurrencyRow/DiamondPanel",
 			"Margin/Root/NavRow/MailButton",
 			"Margin/Root/NavRow/NoticeButton",
+			"Margin/Root/NavRow/LoginBonusButton",
 			"Margin/Root/NavRow/MailButton/MailBadge",
 			"Margin/Root/NavRow/NoticeButton/NoticeBadge",
 		]
@@ -342,3 +343,63 @@ func test_value_labels_have_nonzero_size_beside_icons() -> void:
 			)
 			. is_true()
 		)
+
+
+# ------------------------------------------------ ログインボーナスのボタン（V3c。H1） ----
+
+
+## 前提: ルーターを渡したホーム。期待: ボタン「ログインボーナス」が出ていて（幅・高さが潰れない）、
+## 押すと FROM_HOME の画面へ 1 回だけ遷移する（連打しても 1 回）。メール・お知らせを押しても何も起きない（P3）。
+func test_login_bonus_button_goes_to_from_home_once() -> void:
+	_login({"my_id": "A", "name": "taro", "level": 1}, _stamina(50))
+	var router := ScreenTestDoubles.FakeRouter.new()
+	var screen: HomePresenter = load(HOME_SCENE).instantiate()
+	screen.setup(
+		GetHomeSummaryUseCase.new(_repository, _levels, _config),
+		GetStaminaDisplayUseCase.new(_repository, _clock),
+		Signal(),
+		router
+	)
+	add_child(auto_free(screen))
+	for i in range(3):
+		await get_tree().process_frame
+	var button := screen.get_node("Margin/Root/NavRow/LoginBonusButton") as Button
+	# 1 行では幅（約 290）に収まらないので、「ログイン」「ボーナス」の 2 行にしてある（改行を除くと「ログインボーナス」）
+	assert_str(button.text.replace("\n", "")).is_equal("ログインボーナス")
+	assert_bool(button.is_visible_in_tree()).is_true()
+	assert_float(button.size.x).is_greater(100.0)
+	assert_float(button.size.y).is_greater(100.0)
+	# 「ボタンの文字が切れず収まる」: 折り返し後の最小の高さがボタンの高さ以内
+	assert_float(button.get_minimum_size().y).is_less_equal(button.size.y)
+	# メール・お知らせの隣（同じ行）で、バッジは付けない
+	var mail := screen.get_node("Margin/Root/NavRow/MailButton") as Button
+	assert_float(button.global_position.y).is_equal_approx(mail.global_position.y, 0.5)
+	assert_object(button.get_node_or_null("Badge")).is_null()
+	(screen.get_node("Margin/Root/NavRow/MailButton") as Button).pressed.emit()
+	(screen.get_node("Margin/Root/NavRow/NoticeButton") as Button).pressed.emit()
+	assert_array(router.calls).is_empty()
+	button.pressed.emit()
+	button.pressed.emit()
+	assert_array(router.calls).is_equal(["login_bonus_from_home"])
+
+
+## 前提: ルーターを渡さない（既存の呼び出し）。期待: ボタンを押しても落ちない。
+func test_login_bonus_button_without_router_is_safe() -> void:
+	_login({"my_id": "A", "name": "taro", "level": 1}, _stamina(50))
+	var screen := await _show_home()
+	(screen.get_node("Margin/Root/NavRow/LoginBonusButton") as Button).pressed.emit()
+	assert_bool(is_instance_valid(screen)).is_true()
+
+
+## SceneRouter の定数: FROM_HOME のシーンが実在し、LOGIN_BONUS_SCENE と別で、entry が FROM_HOME。
+func test_scene_router_from_home_scene_exists_with_entry() -> void:
+	var router_script: GDScript = load("res://app/scene_router.gd")
+	var path: String = router_script.get_script_constant_map()["LOGIN_BONUS_FROM_HOME_SCENE"]
+	assert_bool(ResourceLoader.exists(path)).is_true()
+	assert_str(path).is_not_equal(router_script.get_script_constant_map()["LOGIN_BONUS_SCENE"])
+	var scene: LoginBonusPresenter = auto_free(load(path).instantiate())
+	assert_int(scene.entry).is_equal(LoginBonusPresenter.Entry.FROM_HOME)
+	var base: LoginBonusPresenter = auto_free(
+		load(router_script.get_script_constant_map()["LOGIN_BONUS_SCENE"]).instantiate()
+	)
+	assert_int(base.entry).is_equal(LoginBonusPresenter.Entry.FROM_LOGIN)

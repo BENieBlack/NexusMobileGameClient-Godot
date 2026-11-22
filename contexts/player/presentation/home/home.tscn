@@ -216,15 +216,15 @@ theme_override_font_sizes/font_size = 48
 text = "メール"
 
 [node name="MailBadge" type="PanelContainer" parent="Margin/Root/NavRow/MailButton"]
-custom_minimum_size = Vector2(56, 56)
+custom_minimum_size = Vector2(48, 48)
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -72.0
-offset_top = 16.0
-offset_right = -16.0
-offset_bottom = 72.0
+offset_left = -60.0
+offset_top = -12.0
+offset_right = -12.0
+offset_bottom = 36.0
 grow_horizontal = 0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_badge")
@@ -237,15 +237,23 @@ theme_override_font_sizes/font_size = 48
 text = "お知らせ"
 
 [node name="NoticeBadge" type="PanelContainer" parent="Margin/Root/NavRow/NoticeButton"]
-custom_minimum_size = Vector2(56, 56)
+custom_minimum_size = Vector2(48, 48)
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -72.0
-offset_top = 16.0
-offset_right = -16.0
-offset_bottom = 72.0
+offset_left = -60.0
+offset_top = -12.0
+offset_right = -12.0
+offset_bottom = 36.0
 grow_horizontal = 0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_badge")
+
+[node name="LoginBonusButton" type="Button" parent="Margin/Root/NavRow"]
+custom_minimum_size = Vector2(0, 160)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 44
+text = "ログイン\nボーナス"
+clip_text = true

@@ -73,6 +73,20 @@ func test_wallet_row_is_replaced_and_reflected_in_coin_amount() -> void:
 	)
 
 
+## 前提: 取り込み済みのコイン 10 に、updated_resources で gold の行（trx_wallet_list の mst_item_id = gold）が来る。
+## 期待: gold の行は保持に入るが、ホームの「コイン」（CoinAmount。mst_item_id = coin だけを読む）は 10 のまま変わらない
+## （人の決定 C の回帰防止: gold の報酬をコインの表示に混ぜない）。coin の行は残る。
+func test_gold_wallet_row_does_not_change_coin_amount() -> void:
+	var before := CoinAmount.calculate(_repository.current().trx_list("trx_wallet_list"))
+	_use_case.handle(
+		{"trx_wallet_list": [{"mst_item_id": "gold", "free_amount": 9999, "paid_amount": 0}]}
+	)
+	var rows := _repository.current().trx_list("trx_wallet_list")
+	assert_int(rows.size()).is_equal(2)
+	assert_int(CoinAmount.calculate(rows)).is_equal(before)
+	assert_int(before).is_equal(10)
+
+
 ## 前提: trx_stamina_list の normal・trx_diamond。期待: stamina は type で差し替え、diamond は置き換える。
 func test_stamina_by_type_and_diamond_replacement() -> void:
 	(

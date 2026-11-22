@@ -11,9 +11,10 @@
 ##   3. 残り時間が無い（最大値・計算不能・行なし）ときはタイマーを止める。状態が変われば（復帰・マスター更新）再開する
 ##   4. ホームを離れるとき（_exit_tree）はタイマーを止め、シグナルを切る
 ## 値の横のアイコン: スタミナ・コイン・ダイヤの値ラベルの左に ItemIcon（48）を置く（ItemIcon は core/presentation の共通部品）。
-## 導線ボタン（メール・お知らせ）は枠だけで、押しても何も起きない（pressed を接続しない。P3）。
+## 導線ボタン: 「ログインボーナス」（幅に収まらないので 2 行の文字）は押すと FROM_HOME の画面へ遷移する（バッジなし。H1・1-1。連打しても 1 回）。
+##   メール・お知らせは枠だけで、押しても何も起きない（pressed を接続しない。P3）。
 ## セーフエリア: 端末のセーフエリアを SafeAreaMargins でビューポート座標へ直し、Margin の余白に足す。
-## 依存: UseCase 2 つ（テストは setup で渡す）。
+## 依存: UseCase 2 つと遷移（ルーター）。テストは setup で渡す。
 class_name HomePresenter
 extends Control
 
@@ -27,6 +28,9 @@ const ICON_SIZE := 48
 var _get_home_summary: GetHomeSummaryUseCase
 var _get_stamina_display: GetStaminaDisplayUseCase
 var _master_data_loaded: Signal
+var _router: Object
+## ログインボーナス画面へ遷移済みか（連打しても 1 回だけ遷移する）
+var _is_leaving: bool = false
 var _is_configured: bool = false
 var _summary: HomeSummary = HomeSummary.new()
 
@@ -43,6 +47,7 @@ var _diamond_label: Label = $Margin/Root/CurrencyRow/DiamondPanel/VBox/ValueRow/
 @onready var _coin_icon: ItemIcon = $Margin/Root/CurrencyRow/CoinPanel/VBox/ValueRow/CoinIcon
 @onready
 var _diamond_icon: ItemIcon = $Margin/Root/CurrencyRow/DiamondPanel/VBox/ValueRow/DiamondIcon
+@onready var _login_bonus_button: Button = $Margin/Root/NavRow/LoginBonusButton
 @onready var _timer: Timer = $StaminaTimer
 
 
@@ -51,11 +56,13 @@ var _diamond_icon: ItemIcon = $Margin/Root/CurrencyRow/DiamondPanel/VBox/ValueRo
 func setup(
 	get_home_summary: GetHomeSummaryUseCase,
 	get_stamina_display: GetStaminaDisplayUseCase,
-	master_data_loaded: Signal = Signal()
+	master_data_loaded: Signal = Signal(),
+	router: Object = null
 ) -> void:
 	_get_home_summary = get_home_summary
 	_get_stamina_display = get_stamina_display
 	_master_data_loaded = master_data_loaded
+	_router = router
 	_is_configured = true
 
 
@@ -64,8 +71,10 @@ func _ready() -> void:
 		setup(
 			AppContext.get_home_summary_use_case(),
 			AppContext.get_stamina_display_use_case(),
-			AppContext.check_master_data_use_case().master_data_loaded
+			AppContext.check_master_data_use_case().master_data_loaded,
+			SceneRouter
 		)
+	_login_bonus_button.pressed.connect(_on_login_bonus_pressed)
 	_timer.wait_time = 1.0
 	_timer.one_shot = false
 	_timer.timeout.connect(_on_timer_timeout)
@@ -124,6 +133,15 @@ func refresh_stamina() -> void:
 		_timer.stop()
 	elif _timer.is_stopped():
 		_timer.start()
+
+
+## 「ログインボーナス」ボタン。FROM_HOME の画面へ遷移する（遷移は 1 回だけ。シーンの切り替えはフレームの後に行われ、
+## その間に連打されても二重に切り替えない）。
+func _on_login_bonus_pressed() -> void:
+	if _is_leaving or _router == null:
+		return
+	_is_leaving = true
+	_router.goto_login_bonus_from_home()
 
 
 func _on_timer_timeout() -> void:

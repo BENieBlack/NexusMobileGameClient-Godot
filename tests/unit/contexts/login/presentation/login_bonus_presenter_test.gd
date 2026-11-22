@@ -2,7 +2,7 @@
 ##
 ## 確かめること: 段・報酬の行・再表示の旨の表示切り替え、文字の画面（今の build_text。受け取り済みの文・グレード・
 ## 名前の規則）、「読み込み中…」、TapCatcher のタップ（ホームへ 1 回・アニメーション中は飛ぶだけ）、
-## 受け取りの枠（V3b は出さない）、マスターを引く窓口へ進捗を渡すこと。
+## 受け取りの枠、マスターを引く窓口へ進捗を渡すこと。
 extends GdUnitTestSuite
 
 const FX := preload("res://tests/unit/contexts/login/presentation/login_bonus_screen_fixtures.gd")
@@ -98,8 +98,8 @@ func test_only_todays_cell_waits_for_stamp() -> void:
 
 
 ## 前提: 受け取りボタンの表示値が真（VIP の can_re_receive 真）。
-## 期待: V3b ではボタンの枠 ReceiveSlot は出さない（V3c で足す）。画面の値には offer が残る。
-func test_receive_slot_stays_hidden_in_v3b() -> void:
+## 期待: V3c ではボタンの枠 ReceiveSlot が出て、ボタン 1 つ（「受け取る」）が見える。押す処理は login_bonus_receive_test。
+func test_receive_slot_shows_button_when_offered() -> void:
 	_repository.replace_calendars(
 		LoginBonusCalendars.new(
 			LoginBonusCalendar.new("lb", 4, true, false),
@@ -108,8 +108,10 @@ func test_receive_slot_stays_hidden_in_v3b() -> void:
 	)
 	var p := await _show()
 	assert_bool(p.current_screen.receive_offer.visible).is_true()
-	assert_bool((_node(p, "ReceiveSlot") as Control).visible).is_false()
-	assert_int(_node(p, "ReceiveSlot").get_child_count()).is_equal(0)
+	assert_bool((_node(p, "ReceiveSlot") as Control).visible).is_true()
+	var button := _node(p, "ReceiveSlot/ReceiveButton") as Button
+	assert_bool(button.visible).is_true()
+	assert_str(button.text).is_equal("受け取る")
 
 
 ## 前提: 画面を開く。期待: マスターを引く窓口（Prepare）へメモリの進捗がそのまま渡る（通信は偽なのでしない）。

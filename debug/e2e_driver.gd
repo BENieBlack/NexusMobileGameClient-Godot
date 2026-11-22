@@ -40,21 +40,37 @@
 ##   --e2e-stall-clicks=<回> 上と合わせて見る、その画面でのクリック回数（既定 5）。dwell で止まっているだけ・再試行を
 ##                          数回押す確認では失敗にしない。失敗し続ける画面を長く見せる使い方（429・503 を --e2e-fail-count で
 ##                          約 20 回を超えて返す動画など）は FAIL になるので、--e2e-stall-sec=0 で検出を切る
+##   --e2e-open-login-bonus ホームで「ログインボーナス」ボタンをクリックして FROM_HOME の画面を開く（ACTION_DELAY + dwell 待つ）。
+##                          その画面で dwell 待ち、ボタンの無い位置（「タップして続ける」の枠）をクリックしてホームへ戻り、終了する
+##   --e2e-receive=home|login 指定した入口の画面で、受け取りボタンが出ていれば dwell の後にボタンの中心をクリックする（無ければ
+##                          「ボタン無し」を出す）。指定と違う入口では押さず、ボタンの無い位置をクリックして進む。値なしは無効。
+##                          押した後は応答（`E2E: 受け取り応答 frame=… t=…`。再受け取りの押印のコマの基準。設計 11-1）を待ち、
+##                          dwell 後にボタンの無い位置をクリックする。home は --e2e-open-login-bonus と併せて使う
+##   --e2e-stale-receive    --e2e-receive が押す画面で、押す直前にドライバーが ReceiveVipLoginBonusUseCase を直接呼んで先に
+##                          サーバー側を受け取り済みにする（業務エラー → 取り直しの再現。値なしのフラグ）
+##   --e2e-fail-bonus=<種別> /login_bonus/* の応答を偽の失敗にする（種別は --e2e-fail-login と同じ:
+##                          503 / 409 / 429 / network。回数は --e2e-fail-count。FROM_HOME の list の失敗の確認）
 ##   --e2e-timeout=<秒>     この秒数で打ち切る（既定 120。コード 1）
 ## クリックの送り方: 実際のマウス操作に近づけ、移動 → 押下 → 数フレーム → 解放の順に送る（動画で押下の
 ##   見た目が出る）。座標はビューポート座標で指定し、ウィンドウ座標へ変換して送る（下の make_* と
 ##   to_window_position。画面より大きい解像度でウィンドウが縮むと、そのままでは別の場所を押すため）。
 ## 操作（画面ごと。シーンのパスで判定する）:
 ##   タイトル: 再試行ボタンが見えて押せるなら押す / 規約: 再試行 → 同意ボタンの順に押す
-##   ログインボーナス: 画面中央をクリック / ホーム: 2 秒（+ dwell + home-hold）後にホームの値を出して終了
+##   ログインボーナス（login 直後・ホームから）: ボタンの無い位置をクリック（--e2e-receive の指定があれば受け取りボタン）/
+##   ホーム: 2 秒（+ dwell + home-hold）後にホームの値を出して終了（--e2e-open-login-bonus ならボタンを押して FROM_HOME へ）
 ## 出力: `E2E: ...` の行に経過、最後に `E2E_RESULT: OK ...`（コード 0）、
 ##       `E2E_RESULT: FAIL stalled scene=… last_api_error=…`
 ##       （画面が進まない。コード 1。last_api_error は直近の API 失敗。無ければ none）か `E2E_RESULT: TIMEOUT ...`（コード 1）。
+##       `E2E_RESULT: OK` の末尾に、ログインボーナス画面の最後の状態（bonus_login=… bonus_home=… receive=…。形は
+##       format_bonus_state。マスの状態の並び・受け取りボタンの有無）を足す。
 ##       トークン・秘密鍵・device_id は出さない。
 extends Node
 
 ## 規約の閲覧の操作の段階（--e2e-view-terms）
 enum TermsPhase { OPEN, VIEWING, SCROLLING, CLOSING, DONE }
+
+## 受け取りボタンの操作の段階（--e2e-receive）
+enum ReceivePhase { NONE, PRESSED, DONE }
 
 ## 画面が出てから操作するまでの待ち（秒。録画で表示が見えるように）
 const ACTION_DELAY := 1.5
@@ -67,6 +83,19 @@ const BONUS_SHOT_DELAY := 1.2
 const HOME_QUIT_DELAY := 2.0
 ## 押下してから解放するまでのフレーム数（Button が押下の見た目になり、動画に映る長さ）
 const PRESS_HOLD_FRAMES := 4
+
+## ログインボーナス画面（login_bonus.tscn）の部品のパス
+const BONUS_VBOX := "Margin/Center/Panel/VBox/"
+const BONUS_STATUS_PATH := BONUS_VBOX + "StatusLabel"
+const BONUS_RETRY_PATH := BONUS_VBOX + "RetryButton"
+const BONUS_RECEIVE_PATH := BONUS_VBOX + "ReceiveSlot/ReceiveButton"
+const BONUS_RECEIVE_MESSAGE_PATH := BONUS_VBOX + "ReceiveSlot/ReceiveMessageLabel"
+## 「ボタンの無い位置」: 「タップして続ける」の枠（画面を閉じるタップを受ける。ボタンと重ならない）
+const BONUS_TAP_AREA_PATH := BONUS_VBOX + "TapBg"
+## ホームの「ログインボーナス」ボタン
+const HOME_LOGIN_BONUS_BUTTON_PATH := "Margin/Root/NavRow/LoginBonusButton"
+## 受け取りボタンの結果を待つ最長（秒）。失敗の文が出ない・ボタンも消えない異常でも、閉じる操作へ進む
+const RECEIVE_WAIT_MAX := 8.0
 
 const TITLE_RETRY_PATH := "CenterContainer/PanelContainer/VBoxContainer/RetryButton"
 const TITLE_STATUS_PATH := "CenterContainer/PanelContainer/VBoxContainer/StatusLabel"
@@ -122,6 +151,24 @@ var _home_hold: float = 0.0
 ## ホームに入った最初の値（login_stamina・open_stamina の出力用）。入るまでは null
 var _home_open_summary: HomeSummary = null
 var _home_open_stamina: int = -1
+## 偽の失敗（--e2e-fail-bonus）の種別と残り回数
+var _bonus_fail_kind: String = ""
+var _bonus_fail_remaining: int = 0
+## ホームの「ログインボーナス」ボタンを押したか（--e2e-open-login-bonus は 1 回だけ）
+var _bonus_opened: bool = false
+## 受け取りボタンの操作の段階（NONE → PRESSED → DONE）。入口ごとではなく通しで 1 回だけ押す
+var _receive_phase: ReceivePhase = ReceivePhase.NONE
+## 受け取りボタンを押してからの秒数（応答待ちの上限 RECEIVE_WAIT_MAX の判定用）
+var _receive_wait: float = 0.0
+## 先行受け取り（--e2e-stale-receive）を実行中か・済んだか
+var _stale_running: bool = false
+var _stale_done: bool = false
+## 受け取りの結果（none / no_button / ok / refreshed / failed）。E2E_RESULT に出す
+var _receive_outcome: String = "none"
+## 入口ごとの、ログインボーナス画面の最後の状態の文字列（キー: login / home）。E2E_RESULT に出す
+var _bonus_states: Dictionary = {}
+## FROM_HOME の画面が読み込み完了（描画済み or 失敗表示）になったか。完了時に画面の時間を 0 に戻す
+var _bonus_home_loaded: bool = false
 ## 「画面が進まない」の検出（_ready で引数から作る）。同じ画面で押し続けても遷移しないと FAIL にする
 var _stall: RefCounted = StallDetector.new()
 
@@ -155,10 +202,14 @@ func _ready() -> void:
 		tokens.reset_device_id()
 		print("E2E: トークンと device_id を消しました")
 
-	# --- 2. login の偽の失敗 ---
+	# --- 2. login・ログインボーナス API の偽の失敗（どちらも同じ差し替えの口を使う） ---
 	if _args.has("e2e-fail-login"):
 		_fail_kind = str(_args["e2e-fail-login"])
 		_fail_remaining = int(_args.get("e2e-fail-count", 1))
+		AppContext.api_client().debug_override = _override_request
+	if _args.has("e2e-fail-bonus"):
+		_bonus_fail_kind = str(_args["e2e-fail-bonus"])
+		_bonus_fail_remaining = int(_args.get("e2e-fail-count", 1))
 		AppContext.api_client().debug_override = _override_request
 
 	# --- 3. トークンを不正値にする（規約画面がツリーに入る瞬間に差し替える） ---
@@ -209,16 +260,220 @@ func _process(delta: float) -> void:
 		SceneRouter.AGREEMENT_SCENE:
 			_drive_agreement(scene)
 		SceneRouter.LOGIN_BONUS_SCENE:
-			_maybe_shot("bonus", BONUS_SHOT_DELAY)
-			if _scene_time > ACTION_DELAY + _dwell and not _is_clicking:
-				_scene_time = 0.0
-				_click_at(get_viewport().get_visible_rect().size / 2.0)
+			_drive_login_bonus(scene, "login")
+		SceneRouter.LOGIN_BONUS_FROM_HOME_SCENE:
+			_drive_login_bonus(scene, "home")
 		SceneRouter.HOME_SCENE:
-			_record_home_open()
-			_maybe_shot("home")
-			if _scene_time > HOME_QUIT_DELAY + _dwell + _home_hold:
-				print(_home_result_line())
-				_quit(0)
+			_drive_home(scene)
+
+
+# --- ホーム・ログインボーナス画面の操作 ---
+
+
+## ホーム: 写真を撮り、--e2e-open-login-bonus なら「ログインボーナス」ボタンを押して FROM_HOME へ進む（1 回だけ）。
+## それ以外（または FROM_HOME から戻った後）は、従来どおり一定時間後にホームの値を出して終了する。
+func _drive_home(scene: Node) -> void:
+	_record_home_open()
+	_maybe_shot("home_after_bonus" if _bonus_opened else "home", SHOT_DELAY, "home")
+	if _args.has("e2e-open-login-bonus") and not _bonus_opened:
+		var button := scene.get_node_or_null(HOME_LOGIN_BONUS_BUTTON_PATH) as Button
+		if button == null:
+			# ボタンが無い（開けない）。そのまま終了へ進む
+			print("E2E: ホームにログインボーナスのボタンがありません")
+			_bonus_opened = true
+			return
+		if _scene_time < ACTION_DELAY + _dwell or _is_clicking:
+			return
+		_bonus_opened = true
+		_scene_time = 0.0
+		_click_at(button.get_global_rect().get_center())
+		return
+	if _scene_time > HOME_QUIT_DELAY + _dwell + _home_hold:
+		print(_home_result_line() + bonus_result_suffix(_bonus_states, _receive_outcome))
+		_quit(0)
+
+
+## ログインボーナス画面（entry = "login" か "home"）の操作。
+## 流れ: 読み込み完了を待つ（FROM_HOME。失敗表示も完了）→ 写真と最後の状態の記録 →
+##   --e2e-receive が指定した入口なら受け取りボタンを押して応答を待つ → ボタンの無い位置をクリックしてホームへ。
+## 指定と違う入口では押さず、ボタンの無い位置をクリックして進む（ボタンが出ていても押さない）。
+func _drive_login_bonus(scene: Node, entry: String) -> void:
+	var presenter := scene as LoginBonusPresenter
+	var retry := scene.get_node_or_null(BONUS_RETRY_PATH) as Button
+	var is_error := retry != null and retry.visible
+	# --- 1. 読み込み完了（描画済み・または失敗表示）まで待つ。FROM_HOME は通信が入るので、完了時に画面の時間を 0 に戻し、
+	#        写真・操作の待ちを完了からの時間で数える（FROM_LOGIN は従来どおり画面が出てからの時間） ---
+	if entry == "home" and not _bonus_home_loaded:
+		if presenter == null or (presenter.current_screen == null and not is_error):
+			return
+		_bonus_home_loaded = true
+		_scene_time = 0.0
+		return
+	# --- 2. 写真（FROM_HOME は bonus_home、エラー表示は bonus_home_error）と最後の状態の記録 ---
+	if is_error:
+		_maybe_shot("bonus_home_error", SHOT_DELAY, "bonus_home_error")
+	elif entry == "home":
+		_maybe_shot("bonus_home", BONUS_SHOT_DELAY, "bonus_home")
+	else:
+		_maybe_shot("bonus", BONUS_SHOT_DELAY)
+	if presenter != null and presenter.current_screen != null:
+		_bonus_states[entry] = format_bonus_state(
+			presenter.current_screen, _is_node_visible(scene.get_node_or_null(BONUS_RECEIVE_PATH))
+		)
+	# --- 3. 受け取りボタン（指定した入口だけ。1 回だけ） ---
+	if receive_entry(_args) == entry and _receive_phase != ReceivePhase.DONE:
+		_drive_receive(scene)
+		return
+	# --- 4. 閉じる（ボタンの無い位置をクリック） ---
+	if _scene_time > ACTION_DELAY + _dwell and not _is_clicking:
+		_scene_time = 0.0
+		_click_at(_tap_point(scene))
+
+
+## 受け取りボタンの操作。ボタンが出ていれば（先行受け取りの後）押し、応答を待つ。
+## 応答の判定: ボタンが消えた（成功 or 取り直しでもう受け取れない）→ `E2E: 受け取り応答` の行（基準時刻）。
+##   失敗の文が出た（通信断など。ボタンは残る）・待ちの上限（RECEIVE_WAIT_MAX）→ 失敗として次へ進む。
+func _drive_receive(scene: Node) -> void:
+	var button := scene.get_node_or_null(BONUS_RECEIVE_PATH) as Button
+	if _stale_running:
+		return
+	if _receive_phase == ReceivePhase.NONE:
+		if not _is_node_visible(button):
+			# ボタンが出ていない画面。押さずに進む（確認用に出力する）
+			if _scene_time > ACTION_DELAY + _dwell:
+				print("E2E: 受け取りボタン無し")
+				_receive_outcome = "no_button"
+				_receive_phase = ReceivePhase.DONE
+			return
+		if _scene_time < ACTION_DELAY + _dwell or _is_clicking:
+			return
+		# 押す直前に、別の経路でサーバー側を受け取り済みにする（古い画面のボタンを押して業務エラーにする）
+		if _args.has("e2e-stale-receive") and not _stale_done:
+			_do_stale_receive(scene as LoginBonusPresenter)
+			return
+		_receive_phase = ReceivePhase.PRESSED
+		_receive_wait = 0.0
+		# 受け取りボタンのクリックは「画面を進めるクリック」に数えない（進まない検出の誤検出を避ける）
+		_click_at(button.get_global_rect().get_center(), false)
+		return
+	# PRESSED: 応答待ち
+	_receive_wait += _error_delta
+	if _is_clicking:
+		return
+	var message := scene.get_node_or_null(BONUS_RECEIVE_MESSAGE_PATH) as Label
+	if not _is_node_visible(button):
+		# 応答を受けた。再生するスタンプがあれば成功、無ければ取り直し（業務エラー）の画面
+		_receive_outcome = "ok" if _has_playing_stamp(scene as LoginBonusPresenter) else "refreshed"
+		print(
+			"E2E: 受け取り応答 frame=",
+			Engine.get_frames_drawn(),
+			" t=",
+			"%.3f" % _elapsed,
+			" outcome=",
+			_receive_outcome
+		)
+		_finish_receive()
+	elif (message != null and message.visible) or _receive_wait > RECEIVE_WAIT_MAX:
+		_receive_outcome = "failed"
+		print("E2E: 受け取り失敗 message=", message.text if message != null else "")
+		_finish_receive()
+
+
+func _finish_receive() -> void:
+	_receive_phase = ReceivePhase.DONE
+	# 押した後は dwell 待ってから閉じる（応答の後の画面を見せる）
+	_scene_time = 0.0
+
+
+## 先行受け取り: ドライバーが ReceiveVipLoginBonusUseCase を直接呼ぶ（画面は触らない）。
+## 画面のボタンは古い値のまま残るので、その後に押すとサーバーが業務エラーを返す。
+func _do_stale_receive(presenter: LoginBonusPresenter) -> void:
+	_stale_running = true
+	var offer := presenter.current_screen.receive_offer
+	var result: ReceiveVipLoginBonusResult = await (
+		AppContext
+		. receive_vip_login_bonus_use_case()
+		. handle(offer.mst_vip_login_bonus_id, IdempotencyKey.generate())
+	)
+	print("E2E: 先行受け取り ok=", result.ok)
+	_stale_running = false
+	_stale_done = true
+	# 先行受け取りの後も、画面の待ち時間を計り直して押す（連続で押さない）
+	_scene_time = 0.0
+
+
+## 画面を閉じるタップの位置（ボタンの無い位置）。「タップして続ける」の枠の中心。無ければ画面中央。
+func _tap_point(scene: Node) -> Vector2:
+	var area := scene.get_node_or_null(BONUS_TAP_AREA_PATH) as Control
+	if area != null and area.is_visible_in_tree():
+		return area.get_global_rect().get_center()
+	return get_viewport().get_visible_rect().size / 2.0
+
+
+func _is_node_visible(node: Node) -> bool:
+	return node is Control and (node as Control).is_visible_in_tree()
+
+
+## VIP の今日のマスにスタンプの再生（押し直し）があるか。再受け取りの成功の判定に使う。
+func _has_playing_stamp(presenter: LoginBonusPresenter) -> bool:
+	if (
+		presenter == null
+		or presenter.current_screen == null
+		or presenter.current_screen.vip == null
+	):
+		return false
+	for cell in presenter.current_screen.vip.cells:
+		if cell.play_stamp:
+			return true
+	return false
+
+
+## --e2e-receive の値（home / login）。無い・値なし・他の値は ""（押さない）。
+static func receive_entry(args: Dictionary) -> String:
+	var value: Variant = args.get("e2e-receive", null)
+	if value is String and (value == "home" or value == "login"):
+		return value
+	return ""
+
+
+## ログインボーナス画面の状態を 1 つの文字列にする（E2E_RESULT 用。空白を含まない）。
+## 形: `normal[<マス>,..]/vip[<マス>,..]/button=yes|no/rows=<今日配られた報酬の行数>`。
+## マスは状態の 1 文字（T=今日・R=受け取り済み・F=未来・N=強調なし）で、スタンプを再生するマスは後ろに `!`。
+## 段が無ければ `none`。文字の画面は `text_fallback/button=…/rows=…`。
+static func format_bonus_state(screen: LoginBonusScreen, button_visible: bool) -> String:
+	var button := "yes" if button_visible else "no"
+	if screen.use_text_fallback:
+		return "text_fallback/button=%s/rows=%d" % [button, screen.rewards.size()]
+	return (
+		"normal[%s]/vip[%s]/button=%s/rows=%d"
+		% [_format_stage(screen.normal), _format_stage(screen.vip), button, screen.rewards.size()]
+	)
+
+
+static func _format_stage(stage: CalendarStageView) -> String:
+	if stage == null:
+		return "none"
+	var letters := {
+		CalendarCellView.State.TODAY: "T",
+		CalendarCellView.State.RECEIVED: "R",
+		CalendarCellView.State.FUTURE: "F",
+		CalendarCellView.State.NEUTRAL: "N",
+	}
+	var parts: Array[String] = []
+	for cell in stage.cells:
+		parts.append(str(letters.get(cell.state, "?")) + ("!" if cell.play_stamp else ""))
+	return ",".join(parts)
+
+
+## E2E_RESULT: OK の末尾に足す文字列。入口ごとの最後の状態と受け取りの結果。画面を開かなかったら空。
+static func bonus_result_suffix(states: Dictionary, receive_outcome: String) -> String:
+	var suffix := ""
+	for entry in ["login", "home"]:
+		if states.has(entry):
+			suffix += " bonus_%s=%s" % [entry, states[entry]]
+	if suffix != "":
+		suffix += " receive=%s" % receive_outcome
+	return suffix
 
 
 # --- 描画の指標（--e2e-frame-probe） ---
@@ -240,7 +495,11 @@ func _run_probe(delta: float) -> bool:
 	var seconds := frame_probe_seconds(_args)
 	if seconds <= 0.0 or _probed_scenes.has(_scene_path):
 		return true
-	if _scene_path != SceneRouter.LOGIN_BONUS_SCENE and _scene_path != SceneRouter.HOME_SCENE:
+	if (
+		_scene_path != SceneRouter.LOGIN_BONUS_SCENE
+		and _scene_path != SceneRouter.LOGIN_BONUS_FROM_HOME_SCENE
+		and _scene_path != SceneRouter.HOME_SCENE
+	):
 		return true
 	if _probe == null:
 		_probe = FrameProbe.new(seconds)
@@ -509,6 +768,10 @@ func _screen_error(scene: Node) -> Array:
 		SceneRouter.AGREEMENT_SCENE:
 			retry_path = AGREEMENT_RETRY_PATH
 			status_path = AGREEMENT_STATUS_PATH
+		SceneRouter.LOGIN_BONUS_FROM_HOME_SCENE:
+			# ホームから開いた画面の list の失敗（エラー文＋再試行）
+			retry_path = BONUS_RETRY_PATH
+			status_path = BONUS_STATUS_PATH
 		_:
 			return [false, ""]
 	var retry := scene.get_node_or_null(retry_path) as Button
@@ -588,13 +851,25 @@ static func make_button(window_position: Vector2, pressed: bool) -> InputEventMo
 # --- 偽の失敗・トークンの差し替え ---
 
 
-## ApiClient.debug_override から呼ばれる。login だけ、指定の回数まで偽の失敗を返す（他は null = 本物を送る）。
+## ApiClient.debug_override から呼ばれる。login（--e2e-fail-login）と /login_bonus/*（--e2e-fail-bonus）だけ、
+## 指定の回数まで偽の失敗を返す（他は null = 本物を送る）。
 func _override_request(_method: String, endpoint: String) -> Variant:
-	if endpoint != "/auth/login" or _fail_remaining <= 0:
-		return null
-	_fail_remaining -= 1
-	print("E2E: login を偽の失敗にします kind=", _fail_kind, " 残り=", _fail_remaining)
-	match _fail_kind:
+	if endpoint == "/auth/login" and _fail_remaining > 0:
+		_fail_remaining -= 1
+		print("E2E: login を偽の失敗にします kind=", _fail_kind, " 残り=", _fail_remaining)
+		return _fake_failure(_fail_kind)
+	if endpoint.begins_with("/login_bonus/") and _bonus_fail_remaining > 0:
+		_bonus_fail_remaining -= 1
+		print(
+			"E2E: ", endpoint, " を偽の失敗にします kind=", _bonus_fail_kind, " 残り=", _bonus_fail_remaining
+		)
+		return _fake_failure(_bonus_fail_kind)
+	return null
+
+
+## 種別から偽の失敗の ApiResult を作る（503 / 409 / 429 / それ以外は network）。
+func _fake_failure(kind: String) -> ApiResult:
+	match kind:
 		"503":
 			var maintenance := ApiResult.make_error(AppError.Kind.MAINTENANCE, 503)
 			maintenance.maintenance = {
@@ -632,7 +907,8 @@ func _on_node_added(node: Node) -> void:
 
 ## --e2e-shot が指定されていて、画面が落ち着いたら 1 回だけ保存する。
 ## 同じ状態（key）は 1 回だけ。ヘッドレス（描画なし）では画像が取れないので何もしない。
-func _maybe_shot(key: String, delay: float = SHOT_DELAY) -> void:
+## file_name を渡すとファイル名に使う（既定は key の最初の「_」までの部分。title_error_<hash> のハッシュを落とすため）。
+func _maybe_shot(key: String, delay: float = SHOT_DELAY, file_name: String = "") -> void:
 	if not _args.has("e2e-shot") or _scene_time < delay:
 		return
 	var shot_key := _scene_path + "#" + key
@@ -645,7 +921,8 @@ func _maybe_shot(key: String, delay: float = SHOT_DELAY) -> void:
 	var directory := str(_args["e2e-shot"])
 	DirAccess.make_dir_recursive_absolute(directory)
 	_shot_count += 1
-	var path := "%s/%02d_%s.png" % [directory, _shot_count, key.get_slice("_", 0)]
+	var name_part := file_name if file_name != "" else key.get_slice("_", 0)
+	var path := "%s/%02d_%s.png" % [directory, _shot_count, name_part]
 	var error := texture.get_image().save_png(path)
 	print("E2E: スクリーンショット ", path, " (", error, ")")
 
