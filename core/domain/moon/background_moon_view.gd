@@ -9,6 +9,8 @@
 ##   waxing       満ちていく途中か
 ##   lit_on_right 右側が光るか。北半球は waxing と同じ、南半球は反転（F8・F10）
 ##   hemisphere   判定に使った半球（Hemisphere.Kind）
+##   tilt_radians 明るい縁の向きの傾き（基準の向き［右が光るなら右・左なら左］から、画面で反時計回りが正。
+##                MoonTilt が時刻と位相から近似する。満月・新月では見えない）
 class_name BackgroundMoonView
 extends RefCounted
 
@@ -18,6 +20,7 @@ var illumination: float
 var waxing: bool
 var lit_on_right: bool
 var hemisphere: Hemisphere.Kind
+var tilt_radians: float
 
 
 func _init(
@@ -26,7 +29,8 @@ func _init(
 	p_illumination: float,
 	p_waxing: bool,
 	p_lit_on_right: bool,
-	p_hemisphere: Hemisphere.Kind
+	p_hemisphere: Hemisphere.Kind,
+	p_tilt_radians: float = 0.0
 ) -> void:
 	age_days = p_age_days
 	phase = p_phase
@@ -34,3 +38,4 @@ func _init(
 	waxing = p_waxing
 	lit_on_right = p_lit_on_right
 	hemisphere = p_hemisphere
+	tilt_radians = p_tilt_radians

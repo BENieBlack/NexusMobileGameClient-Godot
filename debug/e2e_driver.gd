@@ -30,6 +30,14 @@
 ##                          スタミナの回復を画面に出し続けて撮るため。--e2e-dwell は全画面に効くので別にする）
 ##   --e2e-clock-skew=<秒>  端末時計のずれ（AppContext.debug_clock().skew_seconds）。正なら端末が進んでいる
 ##                          （サーバー時刻のオフセット補正の確認）
+##   --e2e-moon-date=<日付> 背景の月をその時刻の月にする（YYYY-MM-DD または YYYY-MM-DDTHH:MM。UTC・末尾に Z は付けない。
+##                          時刻を省くと 12:00 UTC。MoonOverride.set_unix。client_design 5 節）
+##   --e2e-moon-age=<日数>  背景の月の月齢を直接指定する（0 以上 29.53 未満の小数。--e2e-moon-date とは併用不可）
+##   --e2e-moon-hemisphere=north|south
+##                          背景の月の半球を指定する（指定しなければタイムゾーンからの判定）。
+##                          月の引数が不正なら起動直後に `E2E_RESULT: FAIL bad-moon-arg <理由>`（コード 1）で止まる
+##   --e2e-moon-hour=<時> 背景の月の傾きの計算に使う現地の太陽時を直接指定する（0 以上 24 未満の小数。
+##                          指定しなければ時刻 + タイムゾーンの差。月の傾き F16。E2E: moon 行に tilt=<度> が出る）
 ##   --e2e-omit-platform    X-Platform を付けない状態にする（api_client().set_platform("")。99003 の表示の確認）
 ##   --e2e-frame-probe=<秒> ログインボーナス画面とホームが出てから指定秒のあいだ、描画の指標（処理時間・ドロー呼び出し・
 ##                          オブジェクト数・ノード数）を毎フレーム集めて `E2E_PROBE:` の行に平均・最大を出す（FrameProbe。
@@ -190,6 +198,9 @@ func _ready() -> void:
 	if _args.has("e2e-clock-skew"):
 		AppContext.debug_clock().skew_seconds = clock_skew_seconds(_args)
 		print("E2E: 端末時計のずれ ", AppContext.debug_clock().skew_seconds, " 秒")
+	if not _apply_moon_args():
+		# 月の引数が不正: 録画で黙って別の月が出ないよう、画面を出す前に止める
+		return
 	if _args.has("e2e-omit-platform"):
 		AppContext.api_client().set_platform("")
 		print("E2E: X-Platform を付けません")
@@ -238,6 +249,7 @@ func _process(delta: float) -> void:
 		print(
 			"E2E: 画面 ", _scene_path, " frame=", Engine.get_frames_drawn(), " t=", "%.3f" % _elapsed
 		)
+		_print_moon_line()
 	_scene_time += delta
 	_error_delta = delta
 
@@ -562,6 +574,42 @@ static func home_hold_seconds(args: Dictionary) -> float:
 	if value is String and value.is_valid_float():
 		return maxf(0.0, value.to_float())
 	return 0.0
+
+
+## 背景の月の引数（--e2e-moon-*）を MoonOverride へ設定する。
+## 戻り値: 続けてよければ true。引数が不正なら FAIL の行を出して終了を始め、false。
+func _apply_moon_args() -> bool:
+	var parsed := E2eMoonArgs.parse(_args)
+	if parsed["error"] != "":
+		print("E2E_RESULT: FAIL bad-moon-arg ", parsed["error"])
+		_quit(1)
+		return false
+	var moon_override := AppContext.debug_moon_override()
+	if parsed.has("unix"):
+		moon_override.set_unix(parsed["unix"])
+	if parsed.has("age_days"):
+		moon_override.set_age_days(parsed["age_days"])
+	if parsed.has("hemisphere"):
+		moon_override.set_hemisphere(parsed["hemisphere"])
+	if parsed.has("local_hour"):
+		moon_override.set_local_hour(parsed["local_hour"])
+	if parsed.size() > 1:
+		print("E2E: 月の上書き ", parsed)
+	return true
+
+
+## 背景の月がある画面が出たとき、UseCase が計算した直近の月の値を 1 行出す（録画の期待値の照合用）。
+## 画面のノードは探さず、MoonOverride.last_view（デバッグ観測用）を読む。月の無い画面（規約）では出さない。
+func _print_moon_line() -> void:
+	var has_moon := (
+		_scene_path == SceneRouter.TITLE_SCENE
+		or _scene_path == SceneRouter.LOGIN_BONUS_SCENE
+		or _scene_path == SceneRouter.LOGIN_BONUS_FROM_HOME_SCENE
+		or _scene_path == SceneRouter.HOME_SCENE
+	)
+	var view := AppContext.debug_moon_override().last_view
+	if has_moon and view != null:
+		print(E2eMoonArgs.format_line(view))
 
 
 ## --e2e-clock-skew の値（秒。負も可）。無い・整数でない（値なしの true を含む）は 0。

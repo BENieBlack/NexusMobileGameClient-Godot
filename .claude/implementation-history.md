@@ -115,3 +115,17 @@
 - `SafeAreaMargins` を `contexts/player/presentation/home/` から `core/presentation/` へ移動（ホームとログインボーナス画面が共有）
 - e2e ドライバー: `--e2e-open-login-bonus`（ホームのボタンから開く）・`--e2e-receive=home|login`・`--e2e-stale-receive`（押す直前に先に受け取って業務エラーを再現）・`--e2e-fail-bonus=<種別>`（`/login_bonus/*` の偽の失敗）。`E2E_RESULT: OK` にログインボーナス画面の最後の状態を足す
 - debug: `login_bonus_preview`（偽のマスター・API で画面を描いて撮る）
+
+
+## 背景の月の満ち欠け 第 2 段: 描画・3 画面への組み込み・e2e 引数・動画の再生成（2026-11）
+
+設計: `docs/design/background-moon-phase/client_design.md`。第 1 段（`core/domain/moon/` の純関数・`GetBackgroundMoonUseCase`・`AppContext` の `get_background_moon_use_case()` / `debug_moon_override()`）に描画をつないだ。
+
+- 共通部品 `core/presentation/background_moon/`（`BackgroundMoon`・`moon.gdshader`・`halo.gdshader`）: `ColorRect` 3 枚（`FogLight`・`Glow`・`Moon`）とシェーダーで描く。`_ready` で 1 回だけ値を受け取り（`_process` なし。画面を開くたびに決め直し）、`resized` で割合（中心 横 78%・縦 11.5%、半径 幅の 125/1080）から置き直す。値の元は旧動画の月。光の矩形はガウスの広がりの 3.2 倍で、縁も 0 へ落とす
+- 3 画面（タイトル・ログインボーナス［両入口は基底の継承］・ホーム）の `.tscn` の `BgVideo` 直後に `BackgroundMoon` を 1 ノード足した。構成テスト（1 つだけ・BgVideo の直後・矩形が BgVideo と一致）あり
+- 霧の月明かりは全面の加算光の近似（雲の位置を知らない）。強さ 0.05 は、旧動画 8 コマから月なしの動画と光のにじみを引いた残りの最小二乗（0.031〜0.065、平均約 0.046）。暗い側（地球照）・模様・陰影の強さは shader の uniform で、人が動画で確認して OK（2026-11-22。最初の強い版は「リッチすぎる」で弱め、明暗の境界のグラデーションだけ強い版に戻した）
+- 動画: `tools/bg_video/generate_bg_video.py` から月・光のにじみ・霧の月明かりを削り `assets/video/bg_loop.ogv` を再生成（1,869,429 B。旧 2,028,637 B）。乱数の並びは変わらない
+- e2e: `--e2e-moon-date`（UTC・時刻省略は 12:00）・`--e2e-moon-age`・`--e2e-moon-hemisphere`。解釈と行の書式は `debug/e2e_moon_args.gd`（`E2eMoonArgs`。`e2e_driver.gd` が 1000 行の lint 上限を超えたため分割）。不正は `E2E_RESULT: FAIL bad-moon-arg <理由>`（コード 1）。月のある画面が出るたび `E2E: moon age=… phase=… illumination=… lit=right|left hemisphere=north|south` を出す（`MoonOverride.last_view` を読む）
+- 月の傾き（要件 F16。人の決定 2026-11-22。旧「対象外」を変更）: `core/domain/moon/moon_tilt.gd`（`MoonTilt`。赤緯 0・緯度 ±35 度・現地平均太陽時の近似で、明るい縁の向きの傾きを求める純関数）、`BackgroundMoonView.tilt_radians`、`MoonOverride.local_hour`、シェーダーの `tilt`（明暗の境目だけを回し、模様は回さない）。`--e2e-moon-hour=<時>` と `E2E: moon … tilt=<度>`。式・仮定・限界は client_design 3-3
+- 月の見た目: 明暗の境界は「強い版」のやわらかい陰影（`terminator_soft` 0.30。細い三日月・満月・新月の近くは自動で狭まる）、模様・周縁減光・地球照は控えめ版
+

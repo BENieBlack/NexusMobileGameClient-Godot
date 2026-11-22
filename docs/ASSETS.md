@@ -2,7 +2,7 @@
 
 ## 背景動画（自作）
 
-`assets/video/bg_loop.ogv`（タイトル・ログインボーナス・ホームの背景）は自作の動画で、外部の素材は使っていない。夜空のグラデーション・月・横にたなびく霧状の薄い雲（周期的なノイズを重ねた帯を、奥は暗く遅く・手前は明るく速く動かす）・星・流れ星を numpy で描いて生成している（1080x1920・25fps・20 秒・音声なし・シームレスにループ・約 2MB）。
+`assets/video/bg_loop.ogv`（タイトル・ログインボーナス・ホームの背景）は自作の動画で、外部の素材は使っていない。夜空のグラデーション・横にたなびく霧状の薄い雲（周期的なノイズを重ねた帯を、奥は暗く遅く・手前は明るく速く動かす）・星・流れ星を numpy で描いて生成している（1080x1920・25fps・20 秒・音声なし・シームレスにループ・約 1.9MB。1,869,429 B）。月・光のにじみ・霧の月明かりは動画に含めず、実行時に `core/presentation/background_moon` が重ね描きする（満ち欠けは端末の現在時刻から決まる。設計: `docs/design/background-moon-phase/client_design.md`）。
 
 - 生成スクリプト: `tools/bg_video/generate_bg_video.py`（Ogg Theora への変換は同じ場所の `yuv2theora.c`。libtheora を使う小さな C のエンコーダで、スクリプトが clang でビルドする）
 - 作り直し: `python3 tools/bg_video/generate_bg_video.py`（numpy・clang・libtheora/libogg が要る。macOS は `brew install theora`）。乱数の種は固定なので、同じ動画になる
@@ -36,11 +36,11 @@
 
 ### 容量の実測（R4）
 
-基準は「アイコン全体 1MB 以内（目安）、かつ背景動画（約 2MB）を超えない」。(a) は SVG のバイト数の合計、(b) は import 後の `.godot/imported/` の該当 `.ctex` の合計、(c) は製品用の複製（`make release-project`）を `--export-pack` で pck にしたときの、アイコンあり・なしのサイズ差（アイコンの表 `item_icon_table.gd` を含む。書き出しテンプレートは要らない）。
+基準は「アイコン全体 1MB 以内（目安）、かつ背景動画（約 1.9MB）を超えない」。(a) は SVG のバイト数の合計、(b) は import 後の `.godot/imported/` の該当 `.ctex` の合計、(c) は製品用の複製（`make release-project`）を `--export-pack` で pck にしたときの、アイコンあり・なしのサイズ差（アイコンの表 `item_icon_table.gd` を含む。書き出しテンプレートは要らない）。
 
 | 時点 | (a) SVG | (b) import 後 | (c) pck の差 |
 | --- | --- | --- | --- |
 | 比較用の 3 点（`free_diamond`・`gold`・`unknown`） | 2,427 B | 9,122 B | 10,468 B |
 | 全 40 点（`items` 29・`fallback` 10・`ui` 1） | 41,792 B | 155,552 B（約 152KB） | 176,660 B（約 173KB） |
 
-背景動画 `bg_loop.ogv` は 2,028,637 B。アイコン全体は 1MB を大きく下回り、動画の約 9% で、基準を満たす。(c) は pck の差で、実機の APK / IPA の容量そのものではない（実機の書き出しは未確認。CLAUDE.md の「未確認」）。
+背景動画 `bg_loop.ogv` は 1,869,429 B（月を外して作り直した値。旧版は 2,028,637 B）。アイコン全体は 1MB を大きく下回り、動画の約 9% で、基準を満たす。(c) は pck の差で、実機の APK / IPA の容量そのものではない（実機の書き出しは未確認。CLAUDE.md の「未確認」）。
