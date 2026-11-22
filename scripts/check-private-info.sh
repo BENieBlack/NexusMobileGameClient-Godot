@@ -159,6 +159,8 @@ while IFS= read -r sha; do
   IFS='|' read -r an ae cn ce < <(git log -1 --format='%an|%ae|%cn|%ce' "$sha")
   check_ident "コミット $short" 作者 "$an" "$ae"
   check_ident "コミット $short" コミッター "$cn" "$ce"
+  # dependabot のメッセージは本文に署名行（Signed-off-by など）を持つため、CI では dependabot 自身のコミットだけメッセージ検査から外す
+  if [ $CI -eq 1 ] && [ "$an" = 'dependabot[bot]' ] && printf '%s' "$ae" | grep -qE '^[0-9]+\+dependabot\[bot\]@users\.noreply\.github\.com$'; then continue; fi
   git log -1 --format=%B "$sha" > "$TMPDIR_/msg"
   scan_file "コミット $short のメッセージ" "$TMPDIR_/msg"
 done < "$SHAS"
