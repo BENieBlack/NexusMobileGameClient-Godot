@@ -1,0 +1,39 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://core/presentation/background_moon/background_moon.gd" id="1_script"]
+[ext_resource type="Shader" path="res://core/presentation/background_moon/moon.gdshader" id="2_moon"]
+[ext_resource type="Shader" path="res://core/presentation/background_moon/halo.gdshader" id="3_halo"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_fog"]
+shader = ExtResource("3_halo")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_glow"]
+shader = ExtResource("3_halo")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_moon"]
+shader = ExtResource("2_moon")
+
+[node name="BackgroundMoon" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_script")
+
+[node name="FogLight" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_fog")
+layout_mode = 0
+mouse_filter = 2
+
+[node name="Glow" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_glow")
+layout_mode = 0
+mouse_filter = 2
+
+[node name="Moon" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_moon")
+layout_mode = 0
+mouse_filter = 2

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """背景動画 assets/video/bg_loop.ogv を、外部素材なしで一から生成する。
 
-夜空のグラデーション・月・ゆっくりたなびく霧状の雲・またたく星・時々走る流れ星を numpy で描き、
+夜空のグラデーション・ゆっくりたなびく霧状の雲・またたく星・時々走る流れ星を numpy で描き、
+月は描かない（月の満ち欠け・光のにじみ・霧の月明かりは、実行時に core/presentation/background_moon が重ね描きする。
+その位置・半径・色は、この動画に焼き込んでいた旧版の値が由来）。
 同梱の小さな C エンコーダ（tools/bg_video/yuv2theora.c、libtheora を使う）で Ogg Theora にする。
 Godot 4 が再生できる動画は Ogg Theora だけで、ffmpeg に libtheora が無い環境でも作れるようにするため。
 
@@ -49,27 +51,13 @@ def lerp_gradient(stops, t):
     return np.stack([np.interp(t, pos, [s[1][c] for s in stops]) for c in range(3)], axis=-1)
 
 
-def disc(xx, yy, cx, cy, r, aa=1.5):
-    """円の被覆率（0..1）。縁を aa ピクセルぶんぼかして滑らかにする。"""
-    d = np.hypot(xx - cx, yy - cy) - r
-    return np.clip(0.5 - d / aa, 0.0, 1.0)
-
-
 def make_base(rng):
-    """静止している背景（グラデーション + 月と光のにじみ + 細かいディザ）を作る。"""
+    """静止している背景（グラデーション + 細かいディザ。月は描かない）を作る。"""
     ys = np.linspace(0.0, 1.0, HEIGHT)
     grad = lerp_gradient(
         [(0.0, (36, 32, 68)), (0.35, (48, 50, 98)), (0.7, (66, 92, 128)), (1.0, (122, 146, 164))], ys
     )
     img = np.repeat(grad[:, None, :], WIDTH, axis=1).astype(np.float32)
-
-    # 月（三日月 = 円から少しずらした円を引く）と、まわりの光のにじみ
-    yy, xx = np.mgrid[0:HEIGHT, 0:WIDTH].astype(np.float32)
-    mx, my, r = 0.78 * WIDTH, 0.115 * HEIGHT, 125.0
-    glow = np.exp(-(np.hypot(xx - mx, yy - my) / (r * 1.7)) ** 2) * 0.28
-    img += glow[..., None] * np.array([150, 150, 190], np.float32)
-    moon = np.clip(disc(xx, yy, mx, my, r) - disc(xx, yy, mx - r * 0.42, my - r * 0.12, r * 0.92), 0, 1)
-    img = img * (1 - moon[..., None]) + moon[..., None] * np.array([250, 250, 255], np.float32)
 
     # 縞（バンディング）を目立たなくする静止ディザ
     img += rng.normal(0.0, 0.6, size=img.shape).astype(np.float32)
@@ -101,15 +89,12 @@ def periodic_noise(rng, width, height, cells_x, cells_y):
     return top * (1 - fy[:, None]) + bot * fy[:, None]
 
 
-MOON = (0.78 * WIDTH, 0.115 * HEIGHT)  # 月の中心（make_base と同じ位置）
-
-
 class FogLayer:
     """横に長くたなびく霧状の薄い雲のレイヤー。1 ループでちょうど canvas_w だけ左へ動いて元に戻る。
 
     作り方: x 方向に周期的なノイズを数オクターブ重ね、縦はセル数を少なくして横長の筋にする。
     それを「しきい値のなだらかな段」で雲と空に分け（縁が硬くならない）、縦の帯の中心に寄せる
-    ガウス型の重みを掛けて、上下がふんわり消える帯にする。月に近い部分だけ月明かりで明るくする。
+    ガウス型の重みを掛けて、上下がふんわり消える帯にする。
     """
 
     def __init__(self, seed, canvas_w, y_top, band_h, color, opacity, cells, thr=(0.4, 0.75)):
@@ -133,17 +118,13 @@ class FogLayer:
         env = np.exp(-(yy * 2.3) ** 2)[:, None]
         self.alpha = (t * env * opacity).astype(np.float32)
         self.color = np.array(color, np.float32)
-        # 月明かり: 月に近いほど雲の色を明るい色へ寄せる（ループ中は月が動かないので 1 回だけ計算）
-        yy2, xx2 = np.mgrid[y_top : y_top + band_h, 0:WIDTH].astype(np.float32)
-        glow = np.exp(-(np.hypot(xx2 - MOON[0], yy2 - MOON[1]) / 380.0) ** 2) * 0.75
-        self.rim = glow[..., None] * (np.array([205, 205, 235], np.float32) - self.color)
 
     def draw(self, img, t_frac):
         """t_frac（0..1）に応じて左へ動かし、画面の幅（WIDTH）だけ切り出して合成する。"""
         shift = int(round(t_frac * self.canvas_w))
         a = np.roll(self.alpha, -shift, axis=1)[:, :WIDTH]
         region = img[self.y_top : self.y_top + self.band_h]
-        region += (self.color + self.rim - region) * a[..., None]
+        region += (self.color - region) * a[..., None]
 
 
 def draw_dot(img, x, y, radius, intensity, cross=0.0):

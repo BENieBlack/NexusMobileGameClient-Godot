@@ -1,9 +1,10 @@
-[gd_scene load_steps=7 format=3 uid="uid://c3x7y9k2n5h8p"]
+[gd_scene load_steps=8 format=3 uid="uid://c3x7y9k2n5h8p"]
 
 [ext_resource type="Script" path="res://contexts/player/presentation/home/home_presenter.gd" id="1_home"]
 [ext_resource type="Theme" path="res://assets/ui/casual_theme.tres" id="2_theme"]
 [ext_resource type="VideoStream" path="res://assets/video/bg_loop.ogv" id="4_video"]
 [ext_resource type="PackedScene" path="res://core/presentation/item_icon/item_icon.tscn" id="5_icon"]
+[ext_resource type="PackedScene" path="res://core/presentation/background_moon/background_moon.tscn" id="moon_scene"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0.1, 0.42, 0.25, 0.9)
@@ -54,6 +55,9 @@ stream = ExtResource("4_video")
 autoplay = true
 loop = true
 expand = true
+
+[node name="BackgroundMoon" parent="." instance=ExtResource("moon_scene")]
+layout_mode = 1
 
 [node name="StaminaTimer" type="Timer" parent="."]
 

@@ -1,9 +1,10 @@
-[gd_scene load_steps=9 format=3 uid="uid://bw7x3qk5n8h2m"]
+[gd_scene load_steps=10 format=3 uid="uid://bw7x3qk5n8h2m"]
 
 [ext_resource type="Script" path="res://contexts/login/presentation/login_bonus/login_bonus_presenter.gd" id="1_bonus"]
 [ext_resource type="Theme" path="res://assets/ui/casual_theme.tres" id="2_theme"]
 [ext_resource type="PackedScene" path="res://contexts/login/presentation/login_bonus/calendar_section.tscn" id="5_section"]
 [ext_resource type="VideoStream" path="res://assets/video/bg_loop.ogv" id="4_video"]
+[ext_resource type="PackedScene" path="res://core/presentation/background_moon/background_moon.tscn" id="moon_scene"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0.9, 0.65, 0.1, 0.92)
@@ -65,6 +66,9 @@ stream = ExtResource("4_video")
 autoplay = true
 loop = true
 expand = true
+
+[node name="BackgroundMoon" parent="." instance=ExtResource("moon_scene")]
+layout_mode = 1
 
 [node name="TapCatcher" type="Control" parent="."]
 layout_mode = 1

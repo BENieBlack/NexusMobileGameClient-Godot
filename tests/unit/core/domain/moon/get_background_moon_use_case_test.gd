@@ -167,3 +167,37 @@ func test_continuous_across_midnight() -> void:
 	_clock.now = midnight + 60
 	var after := _use_case.handle().age_days
 	assert_float(after - before).is_equal_approx(120.0 / DAY, 0.0001)
+
+
+## 前提: 時刻の上書きなし・北半球。基準の新月の 7 日 17 時間 46 分後（月齢 約 7.74・位相 0.262）で、JST（+9 時間）の
+## 現地 21 時ちょうど。期待: Clock とタイムゾーンの差から現地の太陽時が決まり、右が下がる傾き 約 -43 度（検算した値）。
+func test_tilt_uses_clock_and_time_zone() -> void:
+	_clock.now = MoonPhase.REFERENCE_NEW_MOON_UNIX + 7 * DAY + 17 * 3600 + 46 * 60
+	_zone.zone = "JST"
+	_zone.bias = 540
+	var view := _use_case.handle()
+	assert_bool(view.lit_on_right).is_true()
+	assert_float(rad_to_deg(view.tilt_radians)).is_equal_approx(-42.9, 3.0)
+
+
+## 前提: local_hour を上書き。期待: 時刻・タイムゾーンより優先される（18 時の上弦は傾きほぼ 0）。
+func test_local_hour_override_wins() -> void:
+	_zone.zone = "JST"
+	_zone.bias = 540
+	_override.set_age_days(7.38)
+	_override.set_local_hour(18.0)
+	assert_float(rad_to_deg(_use_case.handle().tilt_radians)).is_equal_approx(0.0, 3.0)
+	_override.set_local_hour(21.0)
+	assert_float(rad_to_deg(_use_case.handle().tilt_radians)).is_less(-30.0)
+
+
+## 前提: 南半球を上書き。期待: 北半球と同じ時刻で傾きの符号が逆（緯度 -35 度。光る側も反転）。
+func test_southern_tilt_is_mirrored() -> void:
+	_override.set_age_days(7.38)
+	_override.set_local_hour(21.0)
+	_override.set_hemisphere(Hemisphere.Kind.NORTH)
+	var north := _use_case.handle()
+	_override.set_hemisphere(Hemisphere.Kind.SOUTH)
+	var south := _use_case.handle()
+	assert_bool(south.lit_on_right).is_not_equal(north.lit_on_right)
+	assert_float(south.tilt_radians).is_equal_approx(-north.tilt_radians, 0.01)
