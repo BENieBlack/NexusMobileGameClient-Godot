@@ -133,6 +133,13 @@ theme_override_font_sizes/font_size = 32
 horizontal_alignment = 1
 autowrap_mode = 3
 
+[node name="RetryButton" type="Button" parent="Margin/Center/Panel/VBox"]
+visible = false
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+text = "再試行"
+
 [node name="NormalSection" parent="Margin/Center/Panel/VBox" instance=ExtResource("5_section")]
 visible = false
 layout_mode = 2
@@ -145,6 +152,24 @@ layout_mode = 2
 visible = false
 layout_mode = 2
 mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="ReceiveButton" type="Button" parent="Margin/Center/Panel/VBox/ReceiveSlot"]
+custom_minimum_size = Vector2(0, 96)
+layout_mode = 2
+theme_override_font_sizes/font_size = 44
+text = "受け取る"
+
+[node name="ReceiveMessageLabel" type="Label" parent="Margin/Center/Panel/VBox/ReceiveSlot"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.95, 0.7, 1)
+theme_override_colors/font_outline_color = Color(0.3, 0.1, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 28
+horizontal_alignment = 1
+autowrap_mode = 3
 
 [node name="RewardsHeader" type="Label" parent="Margin/Center/Panel/VBox"]
 visible = false

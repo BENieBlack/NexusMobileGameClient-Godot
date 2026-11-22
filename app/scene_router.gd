@@ -2,7 +2,7 @@
 ##
 ## 目的: 画面（シーン）のパスを 1 か所に集め、presenter が `SceneRouter.goto_*()` で遷移できるようにする。
 ##       遷移先はコンテキストの presentation のシーン。
-## 流れ: タイトル → 規約 → ログインボーナス → ホーム（login が成功するまで先へ進まない。遷移の判断は各 presenter）。
+## 流れ: タイトル → 規約 → ログインボーナス → ホーム ⇄ ログインボーナス（ホームから）（login が成功するまで先へ進まない。遷移の判断は各 presenter）。
 ## 注意:
 ##   - オートロードなので class_name を付けない（依存チェック L1）。_ready で他のオートロードを呼ばない。
 ##   - 現在のシーンの管理はエンジンの SceneTree.change_scene_to_file に任せる。旧 SceneManager は
@@ -13,6 +13,10 @@ extends Node
 const TITLE_SCENE := "res://contexts/auth/presentation/title/title.tscn"
 const AGREEMENT_SCENE := "res://contexts/agreement/presentation/agreement/agreement.tscn"
 const LOGIN_BONUS_SCENE := "res://contexts/login/presentation/login_bonus/login_bonus.tscn"
+## ホームの「ログインボーナス」ボタンから開く入口（FROM_HOME。login_bonus.tscn の継承シーンで entry だけ違う。1-1）
+const LOGIN_BONUS_FROM_HOME_SCENE := (
+	"res://contexts/login/presentation/login_bonus/" + "login_bonus_from_home.tscn"
+)
 const HOME_SCENE := "res://contexts/player/presentation/home/home.tscn"
 
 
@@ -38,6 +42,11 @@ func goto_agreement() -> void:
 ## ログインボーナス画面へ
 func goto_login_bonus() -> void:
 	change_scene(LOGIN_BONUS_SCENE)
+
+
+## ログインボーナス画面へ（ホームのボタンから。開くたびに POST /login_bonus/list で状態を取る）
+func goto_login_bonus_from_home() -> void:
+	change_scene(LOGIN_BONUS_FROM_HOME_SCENE)
 
 
 ## ホーム画面へ

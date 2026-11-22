@@ -24,6 +24,9 @@
 ##   play_stamp_allowed       偽ならスタンプを再生しない（FROM_HOME の最初の描画。確認のみ。H3）
 ##   play_stamp_normal        偽なら通常の段のスタンプだけ再生しない。再受け取りの成功後に画面を作り直すとき、
 ##                            login で再生済みの通常の段をもう一度鳴らさないため（T5: 再受け取りで真なのは VIP の段だけ）
+##   extra_rewards            再受け取りで今配られた報酬（応答の login_bonus_list）。「今日配られた報酬」の行の
+##                            **最後に足す**（FROM_LOGIN は login の行の後ろ、FROM_HOME は include が偽なので
+##                            この報酬だけの行になる。Q-3）。メモリの login_bonus_list には書かない（login の記録を汚さない）
 ## 名前・アイコンのカテゴリは GetLoginBonusDisplaysUseCase.display_of で引く（画面を開くとき 1 回だけ）。
 class_name GetLoginBonusScreenUseCase
 extends RefCounted
@@ -43,12 +46,16 @@ func handle(
 	masters: LoginBonusStageMasters,
 	include_login_bonus_list: bool,
 	play_stamp_allowed: bool,
-	play_stamp_normal: bool = true
+	play_stamp_normal: bool = true,
+	extra_rewards: Array[LoginBonus] = []
 ) -> LoginBonusScreen:
 	var screen := LoginBonusScreen.new()
 	# 「今日配られた報酬」の行（文字の画面でも同じ行を文字にする）
 	if include_login_bonus_list:
 		screen.rewards = _get_displays.handle()
+	# 再受け取りの報酬は、login の行の後ろに足す（受け取った順のまま）
+	for bonus in extra_rewards:
+		screen.rewards.append(_get_displays.display_of(bonus))
 
 	var calendars := _login_bonus_repository.calendars()
 	var stage_masters := masters if masters != null else LoginBonusStageMasters.new()

@@ -120,3 +120,65 @@ func test_format_home_result() -> void:
 	assert_str(unknown).contains("offset=none")
 	var absent: String = driver.format_home_result(summary, StaminaDisplay.new(), 0, 0, "none")
 	assert_str(absent).contains("stamina=none")
+
+
+# ------------------------------------------------ ログインボーナスの引数・結果（V3c） ----
+
+
+## 前提: --e2e-receive の値。期待: home / login だけ有効。値なし（true）・他の値・引数なしは ""（押さない。設計 11-1）。
+func test_receive_entry_accepts_only_home_or_login() -> void:
+	var driver: GDScript = load(DRIVER)
+	assert_str(driver.receive_entry({"e2e-receive": "home"})).is_equal("home")
+	assert_str(driver.receive_entry({"e2e-receive": "login"})).is_equal("login")
+	assert_str(driver.receive_entry({"e2e-receive": true})).is_equal("")
+	assert_str(driver.receive_entry({"e2e-receive": "both"})).is_equal("")
+	assert_str(driver.receive_entry({})).is_equal("")
+
+
+## 前提: 通常 3 日目が今日（今配った）・VIP が今日（押し直しの再生あり）・ボタンあり・報酬 2 行の画面の値。
+## 期待: マスの状態の並び（T=今日・R=受け取り済み・F=未来、再生するマスに !）・ボタン・行数が空白なしの 1 つの文字列になる。
+func test_format_bonus_state() -> void:
+	var driver: GDScript = load(DRIVER)
+	var screen := LoginBonusScreen.new()
+	screen.normal = _stage([1, 0, 2], -1)
+	screen.vip = _stage([3, 3], 1)
+	screen.rewards = [
+		LoginBonusDisplay.new(LoginBonus.new("u", "item", "a", 1)),
+		LoginBonusDisplay.new(LoginBonus.new("u", "item", "b", 1)),
+	]
+	var text: String = driver.format_bonus_state(screen, true)
+	assert_str(text).is_equal("normal[R,T,F]/vip[N,N!]/button=yes/rows=2")
+	assert_bool(text.contains(" ")).is_false()
+
+
+## 前提: 段が無い画面・文字の画面。期待: none / text_fallback で出る（落ちない）。
+func test_format_bonus_state_without_stage_and_text_fallback() -> void:
+	var driver: GDScript = load(DRIVER)
+	var screen := LoginBonusScreen.new()
+	assert_str(driver.format_bonus_state(screen, false)).is_equal(
+		"normal[none]/vip[none]/button=no/rows=0"
+	)
+	screen.use_text_fallback = true
+	assert_str(driver.format_bonus_state(screen, false)).is_equal("text_fallback/button=no/rows=0")
+
+
+## 前提: 入口ごとの状態と受け取りの結果。期待: 開いた入口だけ bonus_<入口>= を出し、末尾に receive=。
+## ログインボーナス画面に一度も入っていない（記録が空）ときは空文字（従来の E2E_RESULT: OK の行のまま）。
+func test_bonus_result_suffix() -> void:
+	var driver: GDScript = load(DRIVER)
+	assert_str(driver.bonus_result_suffix({}, "none")).is_equal("")
+	assert_str(driver.bonus_result_suffix({"home": "X"}, "ok")).is_equal(" bonus_home=X receive=ok")
+	assert_str(driver.bonus_result_suffix({"home": "H", "login": "L"}, "none")).is_equal(
+		" bonus_login=L bonus_home=H receive=none"
+	)
+
+
+## states: マスの状態の整数（CalendarCellView.State の値）の並び。play_index はスタンプを再生するマスの位置（-1 なし）。
+func _stage(states: Array, play_index: int) -> CalendarStageView:
+	var stage := CalendarStageView.new()
+	for i in range(states.size()):
+		var cell := CalendarCellView.new()
+		cell.state = states[i]
+		cell.play_stamp = i == play_index
+		stage.cells.append(cell)
+	return stage

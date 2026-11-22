@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://contexts/login/presentation/login_bonus/login_bonus.tscn" id="1_base"]
+
+[node name="LoginBonus" instance=ExtResource("1_base")]
+; 入口だけが違う継承シーン（client_design.md 1-1）。LoginBonusPresenter.Entry.FROM_HOME = 1
+entry = 1

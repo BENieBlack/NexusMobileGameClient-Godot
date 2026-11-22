@@ -192,3 +192,51 @@ func test_last_cell_is_wider_when_row_is_short() -> void:
 	)
 	assert_float(cells[6].size.x).is_greater(cells[5].size.x * 1.5)
 	assert_float(cells[0].size.x).is_equal_approx(cells[3].size.x, 1.0)
+
+
+# ------------------------------------------------ 再受け取り（V3c）の構成 ----
+
+
+## 最大構成（報酬 5 行）に受け取りボタン（VIP の can_re_receive 真）を足した進捗を入れる。
+func _put_max_with_button() -> void:
+	FX.put_rewards(_repository, 5)
+	_repository.replace_calendars(
+		LoginBonusCalendars.new(
+			LoginBonusCalendar.new("lb", 3, true, true),
+			LoginBonusCalendar.new("vip", 3, true, true, true, 3)
+		)
+	)
+
+
+## 前提: 最大構成＋受け取りボタン（設計 1-4 の見積りの 1512 に含まれる最大の構成）・iPhone X の安全領域つき。
+## 期待: パネルが安全領域の中に収まる・ボタンとラベルは潰れず・画面内に収まる（収まらないなら縮め方③が要る）。
+func test_max_with_receive_button_fits_and_not_collapsed() -> void:
+	_put_max_with_button()
+	var result := await _layout()
+	var presenter: LoginBonusPresenter = result[0]
+	var panel := presenter.get_node("Margin/Center/Panel") as Control
+	var rect := panel.get_global_rect()
+	var top := LoginBonusPresenter.BASE_MARGIN_VERTICAL + IPHONE_X_SAFE["top"]
+	var bottom := (
+		VIEWPORT_SIZE.y - LoginBonusPresenter.BASE_MARGIN_VERTICAL - IPHONE_X_SAFE["bottom"]
+	)
+	assert_float(rect.position.y).is_greater_equal(top - 0.5)
+	assert_float(rect.end.y).is_less_equal(bottom + 0.5)
+	var button := presenter.get_node("Margin/Center/Panel/VBox/ReceiveSlot/ReceiveButton") as Button
+	assert_bool(button.is_visible_in_tree()).is_true()
+	assert_float(button.size.x).is_greater(200.0)
+	assert_float(button.size.y).is_greater_equal(90.0)
+	assert_int(_assert_labels_not_collapsed(presenter)).is_greater(40)
+
+
+## 前提: FROM_HOME 相当の最大構成（行なし・ボタンあり）。期待: ボタンの文字が潰れず、全 Control が画面内。
+func test_receive_button_inside_screen() -> void:
+	_put_max_with_button()
+	var result := await _layout()
+	var controls: Array[Control] = []
+	_visible_controls(result[0].get_node("Margin"), controls)
+	var screen := Rect2(Vector2.ZERO, Vector2(VIEWPORT_SIZE))
+	for control in controls:
+		if control.size == Vector2.ZERO:
+			continue
+		assert_bool(screen.grow(0.5).encloses(control.get_global_rect())).is_true()

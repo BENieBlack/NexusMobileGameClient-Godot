@@ -22,6 +22,9 @@ class FakeRouter:
 	func goto_login_bonus() -> void:
 		calls.append("login_bonus")
 
+	func goto_login_bonus_from_home() -> void:
+		calls.append("login_bonus_from_home")
+
 	func goto_home() -> void:
 		calls.append("home")
 
