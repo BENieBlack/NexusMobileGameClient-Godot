@@ -21,7 +21,7 @@ res://
 ├── core/                         # ゲーム非依存の基盤（HTTP・設定・Result 等。どこからも使える）
 │   ├── domain/                   # result.gd, app_error.gd, event_bus.gd, json_reader.gd 等
 │   ├── data/                     # http/（ApiClient・ApiResult）, config/（ApiConfig）, storage/
-│   └── presentation/             # toast, loading, エラーダイアログ等の共通 UI
+│   └── presentation/             # toast, loading, エラーダイアログ等の共通 UI。item_icon/（ItemIcon・生成物 ItemIconTable）、safe_area_margins.gd（ホームとログインボーナス画面が共有）
 ├── master_data/                  # 読み取り専用の参照データ。コンテキストに属さない共有モジュール
 │   ├── domain/                   #   mst の読み取りモデル、Repository の契約、同期 UseCase（バージョン確認・更新判定）
 │   └── data/                     #   SQLite 接続、差分ダウンロード、ハッシュ管理、mst Repository の実装、version API 呼び出し
@@ -31,7 +31,7 @@ res://
 │   │   ├── domain/               #   entities/, use_cases/, repositories/（契約の基底クラス）
 │   │   └── data/                 #   api/（呼び出しと応答の型）, local/（保存）, repositories/（契約の実装）
 │   ├── agreement/                # 規約の取得・同意・本文の閲覧、規約画面と閲覧画面
-│   ├── login/                    # POST /auth/login、ログインボーナス画面
+│   ├── login/                    # POST /auth/login、ログインボーナス（カレンダー画面・状態取得・VIP の再受け取り）
 │   ├── player/                   # プレイヤーと所持データの読み取りモデル、ホーム画面（domain/services/ に表示専用の計算）
 │   └── （今後: gacha / unit / equipment …）
 ├── tests/                        # contexts/・master_data/・core/ をミラー（unit / integration / e2e）
@@ -156,7 +156,7 @@ HTTP          core/data/http/api_client.gd               分類・401 の refres
 3. 実装の `auth_api_repository` が `ApiClient.request(...)` を呼ぶ。`ApiClient` は 401 なら refresh して 1 回だけ再送する。refresh に使うトークンは、core が定義した契約を auth の `local_auth_token_repository` が実装して供給する（core は auth を参照しない）
 4. `auth_api_repository` が応答からトークンを取り出し（項目が少ないので専用の応答型は作らない）、失敗なら `ApiResult` を `AppError`（種別つき）に直して `Result` で返す
 5. UseCase が成功時にトークンを `local_auth_token_repository` に保存し、`Result` を返す
-6. 段階 3 で `login_use_case.handle(idempotency_key)`。`login_api_repository` が `POST /auth/login` を送り、`login_response` に変換する。UseCase は、プレイヤー・所持データを `player` コンテキストの公開 UseCase（`apply_login_data_use_case`）に渡し、ログインボーナスは自コンテキストの Repository に保持する
+6. 段階 3 で `login_use_case.handle(idempotency_key)`。`login_api_repository` が `POST /auth/login` を送り、`login_response` に変換する。UseCase は、プレイヤー・所持データを `player` コンテキストの公開 UseCase（`apply_login_data_use_case`）に渡し、ログインボーナスの受取結果（`login_bonus_list`）と段の進捗（`login_bonus_calendar`・`vip_login_bonus_calendar`）は自コンテキストの `LoginBonusRepository` に保持する（`replace` / `replace_calendars`。list・receive の応答でも段の進捗を置き換える。`clear` でセッション破棄時に両方消す）
 7. presenter は `Result` の成否で、エラー文と「再試行」を出す（`core/presentation` の共通表示を使う）か、オートロード名 `SceneRouter` で次の画面へ進む（presenter が UseCase を受け取る `AppContext`、`SceneRouter` は、presentation にだけ許すオートロード名での参照。2 節）
 8. refresh が失敗してセッションを破棄するときは、`ApiClient` が自分のシグナル `session_expired` を出し、`AppContext` がそれを `EventBus.session_expired` に中継する（`core/data` はオートロード名を参照しない。依存チェック A1）。`auth`（トークン）・`player`（所持データ）・`login`（ログインボーナス）が受け手になり、状態を空にする（受け手の登録は `AppContext`）。`master_data` は `session_expired` を受けない（マスターは端末のもので残す）。受けるのは `master_update_required` だけ。`ApiClient` はこれらを直接呼ばない
 
@@ -270,7 +270,7 @@ func sign_in(_device_id: String) -> Result:
 | タイトル | `contexts/auth/presentation/title/title.tscn` | version 確認 → 認証 → login |
 | 規約 | `contexts/agreement/presentation/agreement/agreement.tscn` | 未同意の規約があるときだけ表示。同意を送る。「確認する」で下の閲覧画面を重ねて開く |
 | 規約の閲覧 | `contexts/agreement/presentation/terms_viewer/terms_viewer.tscn` | 規約画面の上に重ねる全画面。規約の URL から HTML を取得し（`FetchAgreementDocumentUseCase`）、`HtmlToBbcode` で BBCode にして `RichTextLabel` に描く。状態は読み込み中 / 表示 / エラー（再試行・ブラウザで開く）。遷移ではなく、閉じると規約画面に戻る |
-| ログインボーナス | `contexts/login/presentation/login_bonus/login_bonus.tscn` | login の結果を表示する（通信しない） |
+| ログインボーナス | `contexts/login/presentation/login_bonus/login_bonus.tscn`（login 直後の入口）・`login_bonus_from_home.tscn`（ホームのボタンから。継承シーンで `entry` だけ変える） | カレンダー（通常の段・VIP の段）と今日の報酬を表示する。login 直後は通信しない。ホームから開くときは `POST /login_bonus/list` で状態を取り、VIP の再受け取りボタン（`POST /login_bonus/receive`）を持つ |
 | ホーム | `contexts/player/presentation/home/home.tscn` | メインメニュー |
 | API テスト | `debug/api_test/api_test.tscn` | デバッグ用（タイトル・ホームからは開けない。直接開く） |
 
@@ -283,6 +283,6 @@ func sign_in(_device_id: String) -> Result:
 - 通信は `core/data/http/ApiClient` に一本化する。HTTP ステータスで失敗を分類し（NETWORK / MAINTENANCE / RATE_LIMITED / CONFLICT / BUSINESS 〔HTTP 299〕/ SESSION_EXPIRED など）、`AppError` として上位に渡す
 - 認証は device_id ベース（sign_up は HMAC-SHA256 署名つき、sign_in）。保存トークンの有無で最初に呼ぶ API を決める。振り分けは `auth` の UseCase が持つ
 - 401 は `ApiClient` が refresh して 1 回だけ再送する。refresh 失敗は `ApiClient` のシグナル `session_expired`（`AppContext` が `EventBus` へ中継）で知らせる
-- 変更を伴う認証付き POST（login・consent）には `X-Unique-Request-Identifier`（冪等キー）を付ける。キーの寿命は「ひとつの操作」で、持つのは presenter（操作の呼び出し元）
+- 変更を伴う認証付き POST（login・consent・`/login_bonus/receive`）には `X-Unique-Request-Identifier`（冪等キー）を付ける。キーの寿命は「ひとつの操作」で、持つのは presenter（操作の呼び出し元）
 - API のベース URL と配信ホストは `ApiConfig` の 1 か所
 - Reverb（WebSocket の通知）の接続先も `ApiConfig`（環境変数 `NEXUS_REVERB_HOST` / `_PORT` / `_SCHEME` / `_APP_KEY`、`[nexus]` の `reverb_host` / `reverb_port` / `reverb_scheme` / `reverb_app_key`、既定 `localhost` / `8080` / `ws` / `nexus-local-key`）。チャンネル認証の URL は API のベース URL の origin + `/broadcasting/auth`（設定は無い。Reverb のポートではなく API サーバーにある）。`Toast`（core/presentation）は `ApiConfig`（core/data）を参照できない（P1）ので、`AppContext.reverb_endpoint()` が作る `ReverbEndpoint`（`core/domain`）を presenter が `Toast.connect_to_reverb()` へ渡す

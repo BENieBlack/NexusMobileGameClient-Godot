@@ -273,6 +273,7 @@ overview の「保存済みトークンの有無で最初に呼ぶ API を決め
 | `trx_equipment_list` | `trx_equipment_list`（**追加**） | 捨てている | 要素: `trx_equipment_id` `mst_equipment_id` `grade` `level` `level_exp` `is_delete` |
 | `trx_stamina_list` | `trx_stamina_list`（**追加**） | 捨てている | 要素: `type` `current_stamina` `recovery_rate_multiplier`（文字列 `"1.00"`）`last_recovery_at` `is_delete` |
 | `login_bonus_list` | `login_bonus_list` | 保持済み | 6 キー常にあり。`expire_at` は常に null、`metadata` は null 可 |
+| `login_bonus_calendar`・`vip_login_bonus_calendar` | `login` の Repository（`LoginBonusRepository.replace_calendars`）。段の進捗だけ | login-bonus-calendar で追加 | キー欠落・null は「その段なし」。項目・仕様は Nexus の `docs/design/login-bonus-calendar/overview.md`、クライアントの扱いは `docs/design/login-bonus-calendar/client_design.md` |
 
 - 応答全体は `login_response`（`data/api`。`RefCounted`。`Resource` は `.tres` / `@export` を使うものだけで、ここは使わない）で型付きオブジェクトにするが、一覧の**要素は Dictionary のまま**保持する（下の方針）。移行時の扱いは 2-3。
 - 永続化しない（セッションのメモリのみ）。`local_player_repository` はメモリのみで、保存の対象に足さない（現行の `save_user_data` と同じ扱い）。

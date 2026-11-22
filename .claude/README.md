@@ -146,6 +146,10 @@ godot --path . -- --e2e-case=smoke --e2e-fail-login=503 --e2e-no-retry   # login
 
 ホームの確認には `--e2e-home-hold=<秒>`（ホームに留まる秒数を足す）、`--e2e-clock-skew=<秒>`（端末時計のずれを作る）、`--e2e-omit-platform`（`X-Platform` を付けない）が使える。終了時の `E2E_RESULT: OK` にホームの値（スタミナ・コイン・ダイヤ・`login_stamina`・`open_stamina`・`offset`）が出る。
 
+ログインボーナスの確認には次の引数が使える（詳細は `debug/e2e_driver.gd` の冒頭）。`--e2e-open-login-bonus`（ホームのボタンから画面を開く）、`--e2e-receive=home|login`（指定した入口で受け取りボタンを押す。`home` は `--e2e-open-login-bonus` と併せる）、`--e2e-stale-receive`（押す直前に先に受け取って業務エラーを再現）、`--e2e-fail-bonus=<種別>`（`/login_bonus/*` の偽の失敗。`network` / `503` / `409` / `429`。回数は `--e2e-fail-count`）。
+
+進まない画面は `--e2e-stall-sec=<秒>`（既定 30。0 以下で検出しない）と `--e2e-stall-clicks=<回>`（既定 5）の両方を満たすと、`E2E_RESULT: FAIL stalled scene=… last_api_error=…`（コード 1）で早く終わる（`debug/e2e_stall_detector.gd`）。`last_api_error` は直近の API 失敗で、無ければ `none`。失敗が続く画面を長く撮るときは `--e2e-stall-sec=0`。読み方と録画の手順は Nexus の `docs/workflow/recording.md`。
+
 引数の一覧は `debug/e2e_driver.gd` の冒頭。sign_up は IP あたり 10 回/時間の上限があるので、`--e2e-reset` を繰り返さない。ボタンのクリックはヘッドレス（`--headless`）では効かないので、再試行ボタンの操作を含むケースは通常起動で動かす。
 
 ## 重要な設計原則

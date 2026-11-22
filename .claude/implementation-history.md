@@ -88,3 +88,30 @@
 - login: 段の進捗 `LoginBonusCalendar(s)`、`LoginBonusStageMasterReader`、`PrepareLoginBonusMasterUseCase`（古いマスターは再取得 1 回。引けない段はその段だけ出さず、出せる段が無いときだけ文字の画面）、`GetLoginBonusScreenUseCase`（表示モデル `LoginBonusScreen`）、`FetchLoginBonusCalendarsUseCase`、`ReceiveVipLoginBonusUseCase`、`LoginBonusCalendarApiRepository`（list は冪等キー無し、receive は有り）
 - player: `ApplyUpdatedResourcesUseCase`
 
+
+
+## login-bonus-calendar V2: アイテムアイコン（2026-11）
+
+設計: `docs/design/login-bonus-calendar/client_design.md`（5 節）。手順・規格は `docs/ASSETS.md`。
+
+- アイコン: 自作 SVG（`assets/icons/items/<mst_item.id>.svg`・`fallback/`・`ui/stamp_check.svg`）を `tools/icons/generate_icons.py` で生成（`make icons`）。検査は `make check-icons`（`make check` に含む）
+- core: `ItemIconResolver`（絵のキーを決める純粋関数。絵の有無は述語 `Callable` で受けるので `core/domain` に置ける）、`core/presentation/item_icon/` の `ItemIcon`（共通部品）と生成物 `ItemIconTable`（`preload` の表。動的な `load` は使わない）
+- player: ホームのスタミナ・コイン・ダイヤの値の横にアイコン（`HomePresenter`）。値ラベルが幅 1 に潰れる不具合も修正
+- debug: `icon_gallery`（全アイコンの一覧。マスターに在って絵が無い ID を赤く出す）
+
+
+## e2e ドライバー: 進まない画面の検出（2026-11）
+
+- `debug/e2e_stall_detector.gd`（`StallDetector`）: 同じ画面に居続け、クリック回数も条件を満たしたら `E2E_RESULT: FAIL stalled scene=… last_api_error=…`（コード 1）で早く終わる。`--e2e-stall-sec`（既定 30。0 以下で無効）・`--e2e-stall-clicks`（既定 5）。直近の API 失敗は `ApiClient`（`last_error`）が保持する
+
+
+## login-bonus-calendar V3b・V3c: カレンダー画面・ホームの入口・VIP の再受け取り（2026-11）
+
+設計: `docs/design/login-bonus-calendar/client_design.md`（1・3・6・7 節）。V3a の UseCase に画面をつないだ。
+
+- 画面（`login/presentation/login_bonus/`）: `LoginBonusPresenter`（入口 `FROM_LOGIN` / `FROM_HOME`。継承シーン `login_bonus_from_home.tscn` が `entry` だけ変える）、`CalendarSection`・`CalendarCell`・`CalendarText`（固定文字を作る静的関数。段・マスの文字の画面は `LoginBonusPresenter.build_text`）・`RewardRow`（今日の報酬の行）・`StampPlayer`（押印のアニメーション）。`LoginBonusPresenter` は背面の `TapCatcher` でホームへ進み、前面の表示専用ノードは `mouse_filter = IGNORE`
+- 入口: login 直後は通信しない。ホームの「ログインボーナス」ボタン（`SceneRouter.goto_login_bonus_from_home()`）は開くたびに `POST /login_bonus/list`（冪等キーなし。`FetchLoginBonusCalendarsUseCase`）
+- 再受け取り: 受け取りボタン → `ReceiveVipLoginBonusUseCase`（`POST /login_bonus/receive`。冪等キーは presenter が持つ）。成功で `ApplyUpdatedResourcesUseCase` が所持数を反映し、VIP の段を置き換える。BUSINESS（26001〜26003）はコードで分岐せず、新しいキーで状態を取り直す
+- `SafeAreaMargins` を `contexts/player/presentation/home/` から `core/presentation/` へ移動（ホームとログインボーナス画面が共有）
+- e2e ドライバー: `--e2e-open-login-bonus`（ホームのボタンから開く）・`--e2e-receive=home|login`・`--e2e-stale-receive`（押す直前に先に受け取って業務エラーを再現）・`--e2e-fail-bonus=<種別>`（`/login_bonus/*` の偽の失敗）。`E2E_RESULT: OK` にログインボーナス画面の最後の状態を足す
+- debug: `login_bonus_preview`（偽のマスター・API で画面を描いて撮る）
