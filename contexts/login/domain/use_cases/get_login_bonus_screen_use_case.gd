@@ -152,7 +152,7 @@ func _build_cell(
 	cell.is_empty = cell.rewards.is_empty()
 	if not cell.is_empty:
 		var first := cell.rewards[0]
-		cell.icon_type = first.bonus.type
+		cell.icon_type = first.icon_type
 		cell.icon_id = first.bonus.id
 		cell.icon_mst_item_type = first.item_type
 		cell.quantity = first.bonus.amount

@@ -1,4 +1,4 @@
-## SafeAreaMargins（物理ピクセル → ビューポート座標）と HomeText の単体テスト。
+## SafeAreaMargins（物理ピクセル → ビューポート座標）の単体テスト。
 extends GdUnitTestSuite
 
 

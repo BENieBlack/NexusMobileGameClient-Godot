@@ -15,6 +15,10 @@ extends RefCounted
 ## mst_item の行ではない type（枠のアイコンの対象外・名前も別の規則。引かない）
 const NON_ITEM_TYPES: Array[String] = ["unit", "equipment", "stamina"]
 
+## 絵の引き方（ItemIconResolver）が「id で引く」type は item・wallet だけ。login_bonus_list の wallet 系の行は
+## type が通貨の種類（gold・coin・food など。サーバーの ResourceType）で来るので、これらは item として id で引く
+const WALLET_TYPES: Array[String] = ["gold", "coin", "food", "wood", "stone", "iron"]
+
 var _get_login_bonuses: GetLoginBonusesUseCase
 var _mst_item_repository: MstItemRepository
 
@@ -36,11 +40,19 @@ func handle() -> Array[LoginBonusDisplay]:
 
 ## 1 件分の表示用の値を作る。
 func display_of(bonus: LoginBonus) -> LoginBonusDisplay:
+	# 絵の type: item・wallet・wallet 系の通貨 type（gold など）は item として id で引く。
+	# それ以外（unit・equipment・stamina・paid_diamond・未知）はそのまま（ItemIconResolver が unknown にする）
+	var by_id := (
+		bonus.type == LoginBonus.TYPE_ITEM or bonus.type == "wallet" or WALLET_TYPES.has(bonus.type)
+	)
+	# item・wallet は元の type のまま（どちらも id で引く）。gold などの通貨 type だけ item に読み替える
+	var icon_type := LoginBonus.TYPE_ITEM if WALLET_TYPES.has(bonus.type) else bonus.type
 	var item := _lookup_item(bonus)
 	if item == null:
-		return LoginBonusDisplay.new(bonus)
-	var item_name := item.name if bonus.type == LoginBonus.TYPE_ITEM else ""
-	return LoginBonusDisplay.new(bonus, item_name, item.type, item.is_wallet)
+		return LoginBonusDisplay.new(bonus, "", "", false, icon_type)
+	# 名前は id で引く行の mst_item の name（マスのグリッドと同じ引き方）。「(ID:…)」は引けないときだけ
+	var item_name := item.name if by_id else ""
+	return LoginBonusDisplay.new(bonus, item_name, item.type, item.is_wallet, icon_type)
 
 
 ## mst_item を引く（item・wallet・その他の未知の type。unit・equipment・stamina は mst_item の行ではないので引かない）。

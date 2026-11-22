@@ -150,6 +150,12 @@ func get_login_bonus_displays_use_case() -> GetLoginBonusDisplaysUseCase:
 	return _get_login_bonus_displays_use_case
 
 
+## ログインボーナスの進捗（login 応答・list 応答）のメモリ保持。ログインボーナス画面が、段のマスターを
+## 引くための進捗を読むのに使う（calendars()）。
+func login_bonus_repository() -> LoginBonusRepository:
+	return _login_bonus_repository
+
+
 func login_use_case() -> LoginUseCase:
 	return _login_use_case
 

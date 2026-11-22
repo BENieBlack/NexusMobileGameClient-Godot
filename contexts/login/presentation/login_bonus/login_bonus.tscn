@@ -1,8 +1,8 @@
-[gd_scene load_steps=8 format=3 uid="uid://bw7x3qk5n8h2m"]
+[gd_scene load_steps=9 format=3 uid="uid://bw7x3qk5n8h2m"]
 
 [ext_resource type="Script" path="res://contexts/login/presentation/login_bonus/login_bonus_presenter.gd" id="1_bonus"]
 [ext_resource type="Theme" path="res://assets/ui/casual_theme.tres" id="2_theme"]
-[ext_resource type="Texture2D" path="res://assets/ui/kenney_yellow/star.png" id="3_star"]
+[ext_resource type="PackedScene" path="res://contexts/login/presentation/login_bonus/calendar_section.tscn" id="5_section"]
 [ext_resource type="VideoStream" path="res://assets/video/bg_loop.ogv" id="4_video"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
@@ -19,6 +19,10 @@ border_color = Color(1.0, 0.85, 0.3, 1)
 shadow_color = Color(0.4, 0.2, 0, 0.5)
 shadow_size = 12
 shadow_offset = Vector2(0, 6)
+content_margin_left = 24.0
+content_margin_top = 24.0
+content_margin_right = 24.0
+content_margin_bottom = 24.0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bonus_bg"]
 bg_color = Color(0.6, 0.35, 0.02, 0.8)
@@ -56,12 +60,13 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 stream = ExtResource("4_video")
 autoplay = true
 loop = true
 expand = true
 
-[node name="CenterContainer" type="CenterContainer" parent="."]
+[node name="TapCatcher" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -69,70 +74,121 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="PanelContainer" type="PanelContainer" parent="CenterContainer"]
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 48
+theme_override_constants/margin_top = 48
+theme_override_constants/margin_right = 48
+theme_override_constants/margin_bottom = 48
+
+[node name="Center" type="CenterContainer" parent="Margin"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="Margin/Center"]
 custom_minimum_size = Vector2(800, 0)
 layout_mode = 2
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/PanelContainer"]
+[node name="VBox" type="VBoxContainer" parent="Margin/Center/Panel"]
 layout_mode = 2
-theme_override_constants/separation = 32
-size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 8
 
-[node name="StarRow" type="HBoxContainer" parent="CenterContainer/PanelContainer/VBoxContainer"]
+[node name="TitleLabel" type="Label" parent="Margin/Center/Panel/VBox"]
 layout_mode = 2
-alignment = 1
-
-[node name="Star1" type="TextureRect" parent="CenterContainer/PanelContainer/VBoxContainer/StarRow"]
-custom_minimum_size = Vector2(72, 72)
-layout_mode = 2
-texture = ExtResource("3_star")
-stretch_mode = 5
-
-[node name="Star2" type="TextureRect" parent="CenterContainer/PanelContainer/VBoxContainer/StarRow"]
-custom_minimum_size = Vector2(72, 72)
-layout_mode = 2
-texture = ExtResource("3_star")
-stretch_mode = 5
-
-[node name="Star3" type="TextureRect" parent="CenterContainer/PanelContainer/VBoxContainer/StarRow"]
-custom_minimum_size = Vector2(72, 72)
-layout_mode = 2
-texture = ExtResource("3_star")
-stretch_mode = 5
-
-[node name="TitleLabel" type="Label" parent="CenterContainer/PanelContainer/VBoxContainer"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 56
-theme_override_colors/font_color = Color(1.0, 0.95, 0.4, 1)
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.95, 0.4, 1)
 theme_override_colors/font_outline_color = Color(0.5, 0.2, 0, 1)
 theme_override_constants/outline_size = 5
+theme_override_font_sizes/font_size = 56
 text = "ログインボーナス！"
 horizontal_alignment = 1
 
-[node name="BonusBg" type="PanelContainer" parent="CenterContainer/PanelContainer/VBoxContainer"]
+[node name="NoticeLabel" type="Label" parent="Margin/Center/Panel/VBox"]
+visible = false
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_bonus_bg")
-
-[node name="BonusLabel" type="Label" parent="CenterContainer/PanelContainer/VBoxContainer/BonusBg"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 36
-theme_override_colors/font_color = Color(1.0, 0.95, 0.7, 1)
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.95, 0.7, 1)
 theme_override_colors/font_outline_color = Color(0.3, 0.1, 0, 1)
 theme_override_constants/outline_size = 2
-text = "ログインボーナス!\n100ゴールドを獲得!"
+theme_override_font_sizes/font_size = 30
+horizontal_alignment = 1
+
+[node name="StatusLabel" type="Label" parent="Margin/Center/Panel/VBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.95, 0.7, 1)
+theme_override_colors/font_outline_color = Color(0.3, 0.1, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 32
 horizontal_alignment = 1
 autowrap_mode = 3
 
-[node name="TapBg" type="PanelContainer" parent="CenterContainer/PanelContainer/VBoxContainer"]
+[node name="NormalSection" parent="Margin/Center/Panel/VBox" instance=ExtResource("5_section")]
+visible = false
 layout_mode = 2
+
+[node name="VipSection" parent="Margin/Center/Panel/VBox" instance=ExtResource("5_section")]
+visible = false
+layout_mode = 2
+
+[node name="ReceiveSlot" type="VBoxContainer" parent="Margin/Center/Panel/VBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="RewardsHeader" type="Label" parent="Margin/Center/Panel/VBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.95, 0.4, 1)
+theme_override_colors/font_outline_color = Color(0.5, 0.2, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 32
+horizontal_alignment = 1
+
+[node name="RewardsList" type="VBoxContainer" parent="Margin/Center/Panel/VBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="BonusBg" type="PanelContainer" parent="Margin/Center/Panel/VBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bonus_bg")
+
+[node name="BonusLabel" type="Label" parent="Margin/Center/Panel/VBox/BonusBg"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.95, 0.7, 1)
+theme_override_colors/font_outline_color = Color(0.3, 0.1, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 36
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="TapBg" type="PanelContainer" parent="Margin/Center/Panel/VBox"]
+layout_mode = 2
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_tap_bg")
 
-[node name="TapLabel" type="Label" parent="CenterContainer/PanelContainer/VBoxContainer/TapBg"]
+[node name="TapLabel" type="Label" parent="Margin/Center/Panel/VBox/TapBg"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
-theme_override_colors/font_color = Color(1.0, 0.9, 0.5, 0.9)
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.5, 0.9)
 theme_override_colors/font_outline_color = Color(0.4, 0.2, 0, 1)
 theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 28
 text = "タップして続ける"
 horizontal_alignment = 1

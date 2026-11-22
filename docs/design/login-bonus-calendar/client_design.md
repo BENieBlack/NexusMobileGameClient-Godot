@@ -73,10 +73,10 @@ LoginBonus (Control, login_bonus_presenter.gd)         … 入口 entry を @exp
 
 | 部品（シーン + スクリプト） | 責務 | 引数 |
 | --- | --- | --- |
-| `calendar_section.tscn`（`LoginBonusCalendarSection`） | 段 1 つ。見出し（「ログインボーナス」/「VIP ボーナス　VIP n」）と、行ごとの `HBoxContainer`（1 行 4 マス。最終日のマスは残りの幅を使う）にマスを並べる。行数はマスターの周期の日数（`cycle_days`）から決まる | `CalendarStageView`、マスの絵のサイズ（通常 80・VIP 72） |
-| `calendar_cell.tscn`（`LoginBonusCalendarCell`） | マス 1 つ。「N 日目」・`ItemIcon`・数量・「＋n」・「今日」の印・縁取り・スタンプ（`TextureRect`）。状態は `apply_state(state, play)` で切り替える（`play = false` が最終状態へ飛ぶ入口。6 節。引数は常にこの 2 つに統一） | `CalendarCellView` |
-| `reward_row.tscn`（`LoginBonusRewardRow`） | 「今日配られた報酬」の 1 行: `ItemIcon`（56）＋「名前 x数量」（名前の規則は今の `build_text` のまま） | `LoginBonusDisplay` |
-| `stamp_player.gd`（`LoginBonusStampPlayer`、RefCounted） | スタンプのアニメーションの再生・即時完了。`Tween` はホストの Node から作る（6 節） | セル、開始の遅れ |
+| `calendar_section.tscn`（`CalendarSection`） | 段 1 つ。見出し（「ログインボーナス」/「VIP ボーナス　VIP n」）と、行ごとの `HBoxContainer`（1 行 4 マス。最終日のマスは残りの幅を使う）にマスを並べる。行数はマスターの周期の日数（`cycle_days`）から決まる | `CalendarStageView`、マスの絵のサイズ（通常 80・VIP 72） |
+| `calendar_cell.tscn`（`CalendarCell`） | マス 1 つ。「N 日目」・`ItemIcon`・数量・「＋n」・「今日」の印・縁取り・スタンプ（`TextureRect`）。状態は `apply_state(state, play)` で切り替える（`play = false` が最終状態へ飛ぶ入口。6 節。引数は常にこの 2 つに統一） | `CalendarCellView` |
+| `reward_row.tscn`（`RewardRow`） | 「今日配られた報酬」の 1 行: `ItemIcon`（56）＋「名前 x数量」（名前の規則は今の `build_text` のまま） | `LoginBonusDisplay` |
+| `stamp_player.gd`（`StampPlayer`、RefCounted） | スタンプのアニメーションの再生・即時完了。`Tween` はホストの Node から作る（6 節） | セル、開始の遅れ |
 | `item_icon.tscn`（`ItemIcon`、`core/presentation/item_icon/`） | アイコンの共通部品（5 節）。ログインボーナス・ホームで共用 | `type`・`id`・`mst_item_type`・サイズ |
 
 1 マスのノード数は、ルート 1＋「N 日目」ラベル・アイコン・数量ラベル・「＋n」ラベル・「今日」印・スタンプで 6〜7。14 マスで約 100 ノード（非機能「マスごとに数個」の範囲）。
@@ -354,13 +354,13 @@ receive 応答: { trx_vip_login_bonus: { mst_vip_login_bonus_id, day, vip_level,
 
 ## 6. スタンプのアニメーション（K1〜K6）
 
-**入口は 1 つ**: `LoginBonusCalendarCell.apply_state(state, play)`。`play = false` なら最終状態（押印済み・縁取りの強調）へ**即時**に飛ぶ。再表示・過去のマス・`FROM_HOME` はこの入口を最初から `play = false` で使う（K6。将来の「アニメーションを減らす設定」はここで`play` を偽にするだけで足りる）。
+**入口は 1 つ**: `CalendarCell.apply_state(state, play)`。`play = false` なら最終状態（押印済み・縁取りの強調）へ**即時**に飛ぶ。再表示・過去のマス・`FROM_HOME` はこの入口を最初から `play = false` で使う（K6。将来の「アニメーションを減らす設定」はここで`play` を偽にするだけで足りる）。
 
 **再生するマス**（K1）: `CalendarCellView.play_stamp = true` のマスだけ。値は `GetLoginBonusScreenUseCase` が「その段が今日の段、かつ `is_granted_now` が真、かつ今日のマス」から作る。`FROM_HOME` の最初の描画では常に偽。
 
 | 項目 | 値（要件の目安を確定） |
 | --- | --- |
-| スタンプの絵 | `assets/icons/ui/stamp_check.svg`: 赤橙（#E0483A 付近）の二重の円の印（外周の輪＋内側の輪）に白いチェック。**形（円＋チェック）で受け取り済みと分かる**（色だけに頼らない）。 マスの 7〜8 割を覆う |
+| スタンプの絵 | `assets/icons/ui/stamp_check.svg`: 赤橙（#E0483A 付近）の二重の円の印（外周の輪＋内側の輪）に白いチェック。**形（円＋チェック）で受け取り済みと分かる**（色だけに頼らない）。 マスの 7〜8 割を覆う（**実装は一辺 88＝マスの 5〜6 割**。押印後も「N 日目」「今日」と数量を読めるよう、絵の位置に収めた。V3b レビューの指摘） |
 | 動き | 初期: スケール 2.0・透明度 0・位置はマスの中心。`Tween` で、スケール 2.0 → 1.0（`TRANS_BACK`・`EASE_OUT`。Godot の既定の overshoot で、着地で少し行き過ぎて戻る＝弾み）、透明度 0 → 1 は最初の 0.1 秒。使う動きは**位置・スケール・透明度だけ**（K5。シェーダ・パーティクルなし） |
 | 時間 | **通常の段: 開始 0.3 秒（画面が出てから）・スタンプ 0.4 秒（着地 0.7 秒）**。**VIP の段: 開始 0.5 秒・0.4 秒（着地 0.9 秒）**。着地で**マスが明るくなる**（`modulate` の明るさを 1.0 → 1.3 → 1.0。**全体で 0.1 秒**）。どちらも 1.0 秒以内に最終状態（通常 0.8 秒・VIP 1.0 秒。K3）。両段を再生しない場合（片方だけ）は、その段の開始のまま |
 | 再受け取り（`FROM_*` 共通） | 画面は既に出ているので、**応答を受けた瞬間に VIP の今日のマスのスタンプを一度外して（透明度 0）、0.3 秒後に同じ動きで押す**（着地 0.7 秒、全体 0.8 秒）。「受け取った感」を出すため（既に押印済みの絵の上に重ねるだけだと変化が分からない。12 節 Q-5 の仮置き） |

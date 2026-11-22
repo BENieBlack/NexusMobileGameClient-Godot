@@ -60,6 +60,9 @@ enum TermsPhase { OPEN, VIEWING, SCROLLING, CLOSING, DONE }
 const ACTION_DELAY := 1.5
 ## 画面のスクリーンショットを撮るまでの待ち（秒。レイアウトが落ち着いてから）
 const SHOT_DELAY := 1.0
+## ログインボーナス画面の写真だけ待つ秒数。VIP のスタンプの演出が 1.0 秒ちょうどで終わるので、終わった後に撮る
+## （client_design.md 6 節「e2e との関係」・11-1）
+const BONUS_SHOT_DELAY := 1.2
 ## ホームに入ってから終了するまでの秒数
 const HOME_QUIT_DELAY := 2.0
 ## 押下してから解放するまでのフレーム数（Button が押下の見た目になり、動画に映る長さ）
@@ -178,7 +181,12 @@ func _process(delta: float) -> void:
 	if scene.scene_file_path != _scene_path:
 		_scene_path = scene.scene_file_path
 		_scene_time = 0.0
-		print("E2E: 画面 ", _scene_path)
+		# frame・t は押印のコマを抜く基準時刻（設計 11-1）。t は録画（Movie Maker は 30fps 固定の delta）の
+		# 動画の先頭からの秒と一致する（_elapsed は delta の積算）。ログインボーナス画面の行の t に 0.2・0.5・1.1 秒を
+		# 足して ffmpeg -ss を決める（押印前・押印中・着地後）
+		print(
+			"E2E: 画面 ", _scene_path, " frame=", Engine.get_frames_drawn(), " t=", "%.3f" % _elapsed
+		)
 	_scene_time += delta
 	_error_delta = delta
 
@@ -201,7 +209,7 @@ func _process(delta: float) -> void:
 		SceneRouter.AGREEMENT_SCENE:
 			_drive_agreement(scene)
 		SceneRouter.LOGIN_BONUS_SCENE:
-			_maybe_shot("bonus")
+			_maybe_shot("bonus", BONUS_SHOT_DELAY)
 			if _scene_time > ACTION_DELAY + _dwell and not _is_clicking:
 				_scene_time = 0.0
 				_click_at(get_viewport().get_visible_rect().size / 2.0)
@@ -624,8 +632,8 @@ func _on_node_added(node: Node) -> void:
 
 ## --e2e-shot が指定されていて、画面が落ち着いたら 1 回だけ保存する。
 ## 同じ状態（key）は 1 回だけ。ヘッドレス（描画なし）では画像が取れないので何もしない。
-func _maybe_shot(key: String) -> void:
-	if not _args.has("e2e-shot") or _scene_time < SHOT_DELAY:
+func _maybe_shot(key: String, delay: float = SHOT_DELAY) -> void:
+	if not _args.has("e2e-shot") or _scene_time < delay:
 		return
 	var shot_key := _scene_path + "#" + key
 	if _shot_keys.has(shot_key):

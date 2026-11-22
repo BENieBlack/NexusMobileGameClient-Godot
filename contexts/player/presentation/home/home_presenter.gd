@@ -160,4 +160,4 @@ func _apply_safe_area() -> void:
 
 ## セーフエリアを使う OS か（OS.get_name() の値を受ける純粋関数）。ノッチ・ホームバーがあるモバイルだけ。
 static func is_safe_area_platform(os_name: String) -> bool:
-	return os_name == "iOS" or os_name == "Android"
+	return SafeAreaMargins.is_safe_area_platform(os_name)

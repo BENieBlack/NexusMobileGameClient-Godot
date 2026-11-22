@@ -356,8 +356,8 @@ func test_cell_rewards_look_up_mst_item_for_item_and_wallet_only() -> void:
 	assert_str(cells[1].icon_type).is_equal("wallet")
 	assert_str(cells[1].icon_mst_item_type).is_equal("currency")
 	assert_bool(cells[1].rewards[0].is_wallet).is_true()
-	# wallet の名前は item の行ではないので item_name には入れない（今のルールのまま）
-	assert_str(cells[1].rewards[0].item_name).is_empty()
+	# wallet の行も、報酬の行（今日配られた報酬）と同じく mst_item の名前を載せる（「(ID:…)」は引けないときだけ）
+	assert_str(cells[1].rewards[0].item_name).is_equal("ゴールド")
 	assert_str(cells[2].icon_mst_item_type).is_empty()
 	assert_bool(_items.asked.has("u1")).is_false()
 	assert_str(cells[3].icon_type).is_equal("mystery")

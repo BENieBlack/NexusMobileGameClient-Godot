@@ -13,6 +13,13 @@ extends RefCounted
 const MAX_RATIO := 0.2
 
 
+## セーフエリアを使う OS か（OS.get_name() の値を受ける純粋関数）。ノッチ・ホームバーがあるモバイルだけ。
+## デスクトップの get_display_safe_area() は「画面（モニター）座標の作業領域」でウィンドウと一致しないため使わない
+## （ホームとログインボーナス画面が同じ判定を使う）。
+static func is_safe_area_platform(os_name: String) -> bool:
+	return os_name == "iOS" or os_name == "Android"
+
+
 ## 戻り値: {"left": float, "top": float, "right": float, "bottom": float}（ビューポート座標。0 以上）。
 ## safe: 物理ピクセルのセーフエリア。window_size: ウィンドウの物理ピクセル。viewport_size: ビューポートの大きさ。
 ## ウィンドウかセーフエリアの大きさが 0 以下（ヘッドレスなど値が取れない）なら、すべて 0。

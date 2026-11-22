@@ -1,0 +1,22 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://contexts/login/presentation/login_bonus/reward_row.gd" id="1_row"]
+[ext_resource type="PackedScene" path="res://core/presentation/item_icon/item_icon.tscn" id="2_icon"]
+
+[node name="RewardRow" type="HBoxContainer"]
+mouse_filter = 2
+theme_override_constants/separation = 16
+script = ExtResource("1_row")
+
+[node name="ItemIcon" parent="." instance=ExtResource("2_icon")]
+layout_mode = 2
+
+[node name="TextLabel" type="Label" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.95, 0.7, 1)
+theme_override_colors/font_outline_color = Color(0.3, 0.1, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 32
+autowrap_mode = 3
