@@ -1,12 +1,13 @@
 ## VIP ログインボーナスの報酬 1 行（mst_vip_login_bonus_content）の読み取りモデル。
 ##
-## 列（実スキーマ）: id（連番）・mst_vip_login_bonus_id・day・content_type・content_mst_id・
+## 列（実スキーマ）: id（文字列。形はサーバーの設計に従う。ここでは値を解釈しない）・
+##   mst_vip_login_bonus_id・day・content_type・content_mst_id・
 ##   content_option（JSON）・content_quantity・amount（報酬の倍率）・sort_desc。
 ## 通常の行と違い deploy_key・is_paid は無い。判断は持たない。
 class_name MstVipLoginBonusContent
 extends RefCounted
 
-var id: int = 0
+var id: String = ""
 var mst_vip_login_bonus_id: String = ""
 var day: int = 0
 var content_type: String = ""

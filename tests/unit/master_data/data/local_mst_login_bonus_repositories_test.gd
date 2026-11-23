@@ -15,13 +15,13 @@ const NORMAL_CONTENT := (
 	+ "content_type TEXT, content_mst_id TEXT, content_option TEXT, content_quantity INTEGER, "
 	+ "amount INTEGER, is_paid INTEGER, sort_desc INTEGER)"
 )
-## VIP は本体にも報酬行にも deploy_key が無い。報酬行は id（連番）あり・is_paid なし
+## VIP は本体にも報酬行にも deploy_key が無い。報酬行は id（文字列）あり・is_paid なし
 const VIP_BODY := (
 	"CREATE TABLE mst_vip_login_bonus (id TEXT PRIMARY KEY, vip_level INTEGER, "
 	+ "loop_days INTEGER)"
 )
 const VIP_CONTENT := (
-	"CREATE TABLE mst_vip_login_bonus_content (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+	"CREATE TABLE mst_vip_login_bonus_content (id TEXT PRIMARY KEY, "
 	+ "mst_vip_login_bonus_id TEXT, day INTEGER, content_type TEXT, content_mst_id TEXT, "
 	+ "content_option TEXT, content_quantity INTEGER, amount INTEGER, sort_desc INTEGER)"
 )
@@ -167,23 +167,31 @@ func test_normal_content_without_sort_desc_column_is_unreadable() -> void:
 
 ## 前提: deploy_key の無い VIP の 2 テーブル。期待: 引ける（deploy_key の列に依存しない）。数量は × 倍率。
 func test_vip_reads_without_deploy_key_column() -> void:
-	_open_vip([VIP_INS + "(NULL, 'vip5', 1, 'item', 'free_diamond', NULL, 50, 4, 0)"])
+	_open_vip(
+		[
+			(
+				VIP_INS
+				+ "('vip5:1:item:free_diamond', 'vip5', 1, 'item', 'free_diamond', NULL, 50, 4, 0)"
+			)
+		]
+	)
 	var lookup := LocalMstVipLoginBonusRepository.new(_database).find_by_id("vip5")
 	assert_int(lookup.status).is_equal(MstLookupStatus.Status.FOUND)
 	assert_int(lookup.bonus.vip_level).is_equal(5)
 	assert_int(lookup.bonus.loop_days).is_equal(7)
 	assert_int(lookup.bonus.contents[0].total_quantity()).is_equal(200)
-	assert_int(lookup.bonus.contents[0].id).is_equal(1)
+	assert_str(lookup.bonus.contents[0].id).is_equal("vip5:1:item:free_diamond")
 
 
 ## 前提: 同じ日に sort_desc 同値の行を id の逆順に近い形で入れる。期待: day → sort_desc 降順 → id 昇順。
 func test_vip_order_by_day_sort_desc_then_id() -> void:
 	_open_vip(
 		[
-			VIP_INS + "(NULL, 'vip5', 2, 'item', 'x', NULL, 1, 1, 0)",
-			VIP_INS + "(NULL, 'vip5', 1, 'item', 'first', NULL, 1, 1, 3)",
-			VIP_INS + "(NULL, 'vip5', 1, 'item', 'second', NULL, 1, 1, 3)",
-			VIP_INS + "(NULL, 'vip5', 1, 'item', 'top', NULL, 1, 1, 8)",
+			VIP_INS + "('vip5:2:item:x', 'vip5', 2, 'item', 'x', NULL, 1, 1, 0)",
+			# 同値の 2 行は id 昇順（first < second）の逆順に入れ、ORDER BY の id ASC が効くことを確かめる
+			VIP_INS + "('vip5:1:item:second', 'vip5', 1, 'item', 'second', NULL, 1, 1, 3)",
+			VIP_INS + "('vip5:1:item:first', 'vip5', 1, 'item', 'first', NULL, 1, 1, 3)",
+			VIP_INS + "('vip5:1:item:top', 'vip5', 1, 'item', 'top', NULL, 1, 1, 8)",
 		]
 	)
 	var contents := LocalMstVipLoginBonusRepository.new(_database).get_by_id("vip5").contents
@@ -211,7 +219,7 @@ func test_vip_content_without_sort_desc_column_is_unreadable() -> void:
 		"vip_content_old.db",
 		[
 			(
-				"CREATE TABLE mst_vip_login_bonus_content (id INTEGER PRIMARY KEY, "
+				"CREATE TABLE mst_vip_login_bonus_content (id TEXT PRIMARY KEY, "
 				+ "mst_vip_login_bonus_id TEXT, "
 				+ "day INTEGER, content_type TEXT, content_mst_id TEXT, content_option TEXT, "
 				+ "content_quantity INTEGER, amount INTEGER)"
