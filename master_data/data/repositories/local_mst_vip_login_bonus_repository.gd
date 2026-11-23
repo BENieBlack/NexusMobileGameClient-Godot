@@ -2,7 +2,7 @@
 ##
 ## 流れは LocalMstLoginBonusRepository と同じ（本体 → 報酬行の 2 回。失敗と 0 件を区別する）。
 ## 違い: VIP の 2 テーブルには deploy_key が無いので、SELECT に含めない（通常の COLUMNS を流用すると
-##       「no such column」で全件が引けなくなる）。報酬行には id（連番）があり、is_paid は無い。
+##       「no such column」で全件が引けなくなる）。報酬行には id（文字列。値は解釈しない）があり、is_paid は無い。
 ## 並び: ORDER BY day, sort_desc DESC, id ASC（同値は id 昇順）。キャッシュは持たない。
 class_name LocalMstVipLoginBonusRepository
 extends MstVipLoginBonusRepository
@@ -51,7 +51,7 @@ func find_by_id(id: String) -> MstVipLoginBonusLookup:
 
 func _row_to_content(row: Dictionary) -> MstVipLoginBonusContent:
 	var content := MstVipLoginBonusContent.new()
-	content.id = MstRowReader.get_int(row, "id")
+	content.id = MstRowReader.get_string(row, "id")
 	content.mst_vip_login_bonus_id = MstRowReader.get_string(row, "mst_vip_login_bonus_id")
 	content.day = MstRowReader.get_int(row, "day")
 	content.content_type = MstRowReader.get_string(row, "content_type")
